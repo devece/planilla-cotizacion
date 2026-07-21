@@ -58,6 +58,17 @@
 </head>
 <body>
 
+<div id="modalCentro" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,.5);">
+    <div class="bg-white rounded-lg p-6 w-full max-w-sm mx-4" style="border: 1px solid var(--aba-border);">
+        <div class="text-sm font-bold uppercase mb-1" style="color: var(--aba-blue);">📁 Selecciona el centro</div>
+        <div id="modalCentroTexto" class="text-xs mb-4" style="color: var(--aba-gray);">Elegí el centro con el que vas a cotizar antes de comenzar.</div>
+        <select id="selCentroInicial" class="w-full border rounded-lg px-3 py-2 mb-4" style="border-color: var(--aba-border);" disabled>
+            <option value="">⏳ Cargando…</option>
+        </select>
+        <button id="btnComenzar" onclick="confirmarCentroInicial()" class="btn-primary w-full" disabled style="opacity:.6;">Comenzar cotización</button>
+    </div>
+</div>
+
 <div class="sticky top-0 z-30 bg-white border-b shadow-sm" style="border-color: var(--aba-border);">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -790,20 +801,38 @@ async function cargarBaseDatos() {
     return porCentro;
 }
 
+function confirmarCentroInicial() {
+    const sel = document.getElementById('selCentroInicial');
+    if (!sel.value) return;
+    CENTRO = sel.value;
+    BASE = BASE_BY_CENTRO[CENTRO] || {};
+    ORDEN_CATS = Object.keys(BASE);
+    document.getElementById('fCentro').value = CENTRO;
+    document.getElementById('fCentro').disabled = false;
+    construirTablas();
+    recalcTotalGeneral();
+    document.getElementById('modalCentro').remove();
+}
+
 (async function iniciar() {
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
-    const cont = document.getElementById('categorias');
-    cont.innerHTML = '<div class="text-center py-10 text-sm" style="color: var(--aba-gray);">⏳ Cargando base de datos…</div>';
+    const sel = document.getElementById('selCentroInicial');
+    const btn = document.getElementById('btnComenzar');
     try {
         BASE_BY_CENTRO = await cargarBaseDatos();
-        CENTRO = CENTROS.find(c => BASE_BY_CENTRO[c]) || CENTRO;
-        BASE = BASE_BY_CENTRO[CENTRO] || {};
-        ORDEN_CATS = Object.keys(BASE);
-        document.getElementById('fCentro').value = CENTRO;
-        document.getElementById('fCentro').disabled = false;
-        construirTablas();
+        const disponibles = CENTROS.filter(c => BASE_BY_CENTRO[c]);
+        if (disponibles.length === 0) {
+            document.getElementById('modalCentroTexto').innerHTML = '⚠️ base_datos.xlsx no tiene datos para ningún centro.';
+            sel.innerHTML = '<option value="">Sin centros disponibles</option>';
+            return;
+        }
+        sel.innerHTML = disponibles.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        sel.disabled = false;
+        btn.disabled = false;
+        btn.style.opacity = '';
     } catch (e) {
-        cont.innerHTML = `<div class="text-center py-10 text-sm text-red-600">⚠️ No se pudo cargar base_datos.xlsx: ${e.message}</div>`;
+        document.getElementById('modalCentroTexto').innerHTML = `⚠️ No se pudo cargar base_datos.xlsx: ${e.message}`;
+        sel.innerHTML = '<option value="">Error al cargar</option>';
     }
 })();
 </script>
