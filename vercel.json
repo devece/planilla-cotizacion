@@ -1,6 +1,6 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/", "destination": "/COTIZACION_LIBRE_ANTOFAGASTA.html" }
+    { "source": "/", "destination": "/Planilla_Cotizacion.html" }
   ]
 }

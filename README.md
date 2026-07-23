@@ -6,7 +6,7 @@ Repositorio independiente, extraído de [nota-de-venta-abastible](https://github
 
 ## Archivos
 
-- `COTIZACION_LIBRE_ANTOFAGASTA.html` — aplicación (una sola página, sin backend).
+- `Planilla_Cotizacion.html` — aplicación (una sola página, sin backend).
 - `base_datos.xlsx` — base de precios por centro/categoría. La app la carga con `fetch()` al abrir la página; para actualizar precios basta con reemplazar este archivo (misma estructura de columnas: `descripción`, `código`, `categoria`, `unidad_medida`, `centro`, `precio`; una hoja por categoría).
 - `libs/exceljs.min.js` — librería usada para exportar la cotización a Excel.
 
