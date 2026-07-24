@@ -69,7 +69,7 @@
 <div class="wrap">
 
     <div class="intro">
-        <p>Esta guía explica paso a paso cómo usar la Planilla de Cotización: elegir el centro, completar los datos del proyecto y del contratista, ingresar cantidades y precios por ítem, revisar el resumen y exportar la cotización a Excel.</p>
+        <p>Esta guía explica paso a paso cómo usar la Planilla de Cotización: elegir el centro, completar los datos del proyecto y del contratista, ingresar cantidades y precios por ítem, revisar el resumen, guardar o recuperar un borrador, y exportar la cotización a Excel.</p>
     </div>
 
     <div class="toc">
@@ -80,7 +80,8 @@
             <li><a href="#paso3">Ingresa cantidades y precio del contratista por ítem</a></li>
             <li><a href="#paso4">Agrega ítems libres (fuera de catálogo)</a></li>
             <li><a href="#paso5">Revisa el resumen (Base Renova + MOI = Total Contratista)</a></li>
-            <li><a href="#paso6">Exporta a Excel o imprime</a></li>
+            <li><a href="#paso6">Guarda, recupera o comparte tu cotización</a></li>
+            <li><a href="#paso7">Exporta a Excel o imprime</a></li>
         </ol>
     </div>
 
@@ -108,6 +109,7 @@
         <p class="desc" style="margin-top:-6px;">Las categorías de cañerías (AP/MP/BP) tienen precio fijo al catálogo Renova y no se editan: son "CATÁLOGO A PRECIO FIJO RENOVA".</p>
         <div class="shot"><img src="assets/manual/03-ingresar-items.png" alt="Tabla de ítems con cantidades, precios y diferencias"></div>
         <div class="note">🔎 Usa el buscador general o el buscador de cada categoría para encontrar un ítem por código o descripción rápidamente.</div>
+        <div class="note">💲 Podés escribir el precio con punto de miles ("9.916") o coma decimal ("9916,5"); la planilla lo interpreta igual y, al salir del casillero, te muestra cómo lo entendió. No admite precios negativos.</div>
     </section>
 
     <section class="step" id="paso4">
@@ -123,13 +125,25 @@
     </section>
 
     <section class="step" id="paso6">
-        <div class="step-head"><div class="step-num">6</div><h2>Exporta a Excel o imprime</h2></div>
+        <div class="step-head"><div class="step-num">6</div><h2>Guarda, recupera o comparte tu cotización</h2></div>
+        <p class="desc">La planilla no guarda nada en un servidor: todo lo que cargás vive únicamente en la pestaña abierta. Para no perder tu trabajo o para seguir cotizando desde otro equipo, usa los botones de la parte superior derecha:</p>
+        <ul>
+            <li><b>💾 Guardar cotización</b>: descarga un archivo <code>.json</code> con todo lo cargado (datos de proyecto, contratista, cantidades, precios e ítems libres).</li>
+            <li><b>📂 Cargar cotización</b>: lee un archivo <code>.json</code> guardado antes y reconstruye la cotización completa, incluido el centro correcto.</li>
+        </ul>
+        <div class="note">📤 Para retomar una cotización en otro dispositivo o compartirla con un colega, enviá ese archivo <code>.json</code> por correo o chat y cargalo del otro lado con "📂 Cargar cotización".</div>
+        <div class="note">⚠️ Cargar un archivo reemplaza los datos que tengas en pantalla; si hay cantidades o precios cargados, la planilla pide confirmación antes de continuar.</div>
+    </section>
+
+    <section class="step" id="paso7">
+        <div class="step-head"><div class="step-num">7</div><h2>Exporta a Excel o imprime</h2></div>
         <p class="desc">Cuando termines de cotizar, usa los botones de la parte superior derecha:</p>
         <ul>
             <li><b>📊 Exportar a Excel</b>: genera un archivo con el detalle completo de la cotización, listo para enviar o archivar.</li>
             <li><b>🖨️ Imprimir</b>: abre el diálogo de impresión del navegador para imprimir o guardar como PDF.</li>
         </ul>
         <div class="shot"><img src="assets/manual/06-exportar.png" alt="Botones de exportar a Excel e imprimir"></div>
+        <div class="note">✅ Antes de exportar, la planilla exige que hayas completado Proyecto, Cliente, Nombre Proveedor y al menos un ítem con cantidad. Si falta algo, te avisa exactamente qué completar y no genera el archivo.</div>
     </section>
 
 </div>
