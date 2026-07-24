@@ -80,6 +80,9 @@
         </div>
         <div class="flex gap-2 items-center">
             <a href="manual.html" target="_blank" rel="noopener" class="text-sm font-semibold" style="color: var(--aba-blue); text-decoration: underline; margin-right: 4px;">📖 Manual de Uso</a>
+            <input type="file" id="inputCargarCotizacion" accept="application/json" style="display:none" onchange="cargarCotizacionArchivo(this)">
+            <button onclick="document.getElementById('inputCargarCotizacion').click()" class="btn-secondary">📂 Cargar cotización</button>
+            <button onclick="guardarCotizacion()" class="btn-secondary">💾 Guardar cotización</button>
             <button onclick="exportarExcel()" class="btn-primary">📊 Exportar a Excel</button>
             <button onclick="window.print()" class="btn-secondary">🖨️ Imprimir</button>
         </div>
@@ -203,11 +206,13 @@ let ORDEN_CATS = [];
 let customItems = {};
 let nextCustomId = 1;
 
+function hayDatosIngresados() {
+    return Object.values(customItems).some(arr => arr && arr.length > 0)
+        || Array.from(document.querySelectorAll('tr.row .inp-cant')).some(inp => parseFloat(inp.value) > 0);
+}
+
 function cambiarCentro(nuevoCentro) {
-    const hayDatos = Object.values(customItems).some(arr => arr && arr.length > 0)
-        || document.querySelectorAll('tr.row .inp-cant').length > 0
-        && Array.from(document.querySelectorAll('tr.row .inp-cant')).some(inp => parseFloat(inp.value) > 0);
-    if (hayDatos && !confirm('Cambiar de centro borra las cantidades y precios ya ingresados. ¿Continuar?')) {
+    if (hayDatosIngresados() && !confirm('Cambiar de centro borra las cantidades y precios ya ingresados. ¿Continuar?')) {
         document.getElementById('fCentro').value = CENTRO;
         return;
     }
@@ -471,6 +476,114 @@ function filtrarCategoria(catIdx, q) {
         const match = !q || row.dataset.search.includes(q);
         row.style.display = match ? '' : 'none';
     });
+}
+
+// ============================================================
+// GUARDAR / CARGAR COTIZACIÓN (archivo .json) — permite recuperar
+// o compartir un borrador entre dispositivos sin backend.
+// ============================================================
+function val(id) { return document.getElementById(id).value; }
+
+function recopilarEstado() {
+    const items = [];
+    ORDEN_CATS.forEach((cat, catIdx) => {
+        const esFijo = CATS_PRECIO_FIJO.includes(cat);
+        (BASE[cat] || []).forEach((it, itIdx) => {
+            const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+            const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
+            const precio = row.querySelector('.inp-precio').value.trim();
+            if (cant > 0 || (!esFijo && precio)) items.push({ cat, codigo: it.c, cant, precio });
+        });
+    });
+    const libres = [];
+    Object.entries(customItems).forEach(([catIdx, arr]) => {
+        const cat = ORDEN_CATS[catIdx];
+        (arr || []).forEach(item => libres.push({ cat, d: item.d, u: item.u, cant: item.cant, precio: item.precio }));
+    });
+    return {
+        version: 1,
+        centro: CENTRO,
+        proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha') },
+        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fTelefono: val('fTelefono') },
+        items, libres
+    };
+}
+
+function guardarCotizacion() {
+    const estado = recopilarEstado();
+    const blob = new Blob([JSON.stringify(estado, null, 2)], { type: 'application/json' });
+    const proyecto = (val('fProyecto') || 'SIN_PROYECTO').replace(/\s+/g, '_');
+    const centroArchivo = CENTRO.replace(/\s+/g, '_').toUpperCase();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `COTIZACION_${centroArchivo}_${proyecto}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+function cargarCotizacionArchivo(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (hayDatosIngresados() && !confirm('Cargar una cotización guardada reemplaza los datos actuales. ¿Continuar?')) {
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            aplicarEstado(JSON.parse(e.target.result));
+        } catch (err) {
+            alert('No se pudo leer el archivo (¿es una cotización .json válida?): ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    input.value = '';
+}
+
+function aplicarEstado(estado) {
+    if (!estado || !estado.centro || !BASE_BY_CENTRO[estado.centro]) {
+        alert('El archivo no corresponde a un centro válido o la base de datos actual no lo incluye.');
+        return;
+    }
+    CENTRO = estado.centro;
+    BASE = BASE_BY_CENTRO[CENTRO];
+    ORDEN_CATS = Object.keys(BASE);
+    customItems = {};
+    nextCustomId = 1;
+    document.getElementById('fCentro').value = CENTRO;
+    document.getElementById('fCentro').disabled = false;
+    construirTablas();
+
+    Object.entries(estado.proyecto || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
+    Object.entries(estado.contratista || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
+
+    (estado.items || []).forEach(({ cat, codigo, cant, precio }) => {
+        const catIdx = ORDEN_CATS.indexOf(cat);
+        if (catIdx === -1) return;
+        const itIdx = (BASE[cat] || []).findIndex(it => it.c === codigo);
+        if (itIdx === -1) return;
+        const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+        if (!row) return;
+        row.querySelector('.inp-cant').value = cant || '';
+        if (precio) row.querySelector('.inp-precio').value = precio;
+        recalcFila(catIdx, itIdx);
+    });
+
+    (estado.libres || []).forEach(({ cat, d, u, cant, precio }) => {
+        const catIdx = ORDEN_CATS.indexOf(cat);
+        if (catIdx === -1) return;
+        const addRow = document.querySelector(`tr.add-row[data-cat="${catIdx}"]`);
+        if (!addRow) return;
+        addRow.querySelector('.inp-libre-desc').value = d;
+        addRow.querySelector('.inp-libre-unidad').value = u;
+        addRow.querySelector('.inp-libre-cant').value = cant;
+        addRow.querySelector('.inp-libre-precio').value = precio;
+        agregarItemLibre(catIdx);
+    });
+
+    recalcTotalGeneral();
+    const modal = document.getElementById('modalCentro');
+    if (modal) modal.remove();
 }
 
 // ============================================================
