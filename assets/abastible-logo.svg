@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 230" role="img" aria-label="Abastible">
+  <!-- Blob / speech-bubble shape -->
+  <path fill="#FE5100" d="M 78 34
+    C 30 46, 8 96, 34 134
+    C 16 148, 26 176, 56 168
+    C 96 194, 176 196, 216 168
+    C 262 136, 258 66, 208 38
+    C 168 14, 112 16, 78 34 Z"/>
+  <!-- White "a" -->
+  <text x="168" y="150" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="150"
+        fill="#ffffff" letter-spacing="-2">a</text>
+  <!-- Wordmark -->
+  <text x="10" y="215" text-anchor="start"
+        font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="62"
+        fill="#001489">abastible</text>
+</svg>
