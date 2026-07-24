@@ -231,6 +231,33 @@ function fmt(n) {
     if (n === 0) return "0";
     return Math.round(n).toLocaleString("es-CL");
 }
+// Interpreta precios en formato chileno ("9.916" = nueve mil, "9916,5" = decimal).
+// Nunca negativo: un precio contratista negativo no tiene sentido de negocio.
+function parsePrecio(str) {
+    str = String(str ?? '').trim();
+    if (!str) return 0;
+    const tienePunto = str.includes('.');
+    const tieneComa = str.includes(',');
+    if (tienePunto && tieneComa) {
+        str = str.replace(/\./g, '').replace(',', '.');
+    } else if (tieneComa) {
+        str = str.replace(',', '.');
+    } else if (tienePunto) {
+        // Un solo punto con exactamente 3 dígitos después: separador de miles ("9.916" -> 9916).
+        // Si no, se asume punto decimal ("9.5" -> 9.5).
+        const partes = str.split('.');
+        if (partes.length === 2 && partes[1].length === 3) str = partes.join('');
+    }
+    const n = parseFloat(str);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return n;
+}
+// Al perder foco, muestra el precio ya interpretado (formato "es-CL") para que
+// el contratista confirme que "9.916" se leyó como $9.916 y no como 9,916.
+function reformatearPrecio(input) {
+    const n = parsePrecio(input.value);
+    input.value = n > 0 ? fmt(n) : '';
+}
 function fmtMoneyPlain(n) { return '$' + fmt(n); }
 // Formato contabilidad: signo $ pegado a la izquierda, cifra pegada a la derecha
 function fmtMoney(n) {
@@ -280,7 +307,7 @@ function construirTablas() {
                 <td class="text-right"><input type="number" min="0" step="0.5" class="input-num inp-cant" value="" oninput="recalcFila(${catIdx},${itIdx})"></td>
                 <td class="text-right">${fmtMoney(it.p)}</td>
                 <td class="text-right cell-totrenova">${fmtMoney(0)}</td>
-                <td class="text-right"><input type="text" inputmode="decimal" class="input-num inp-precio" value="${esFijo ? it.p : ''}" placeholder="${esFijo ? '' : 'Ingrese valor'}" ${esFijo ? 'disabled' : ''} oninput="recalcFila(${catIdx},${itIdx})"></td>
+                <td class="text-right"><input type="text" inputmode="decimal" class="input-num inp-precio" value="${esFijo ? it.p : ''}" placeholder="${esFijo ? '' : 'Ingrese valor'}" ${esFijo ? 'disabled' : ''} oninput="recalcFila(${catIdx},${itIdx})" onblur="reformatearPrecio(this)"></td>
                 <td class="text-right cell-totctta">${fmtMoney(0)}</td>
                 <td class="text-right cell-dif">${fmtMoneyColor(0)}</td>
                 <td></td>
@@ -321,7 +348,7 @@ function recalcFila(catIdx, itIdx) {
     const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
     const it = BASE[ORDEN_CATS[catIdx]][itIdx];
     const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
-    const precioCtta = parseFloat(row.querySelector('.inp-precio').value) || 0;
+    const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
     const totRenova = cant * it.p;
     const totCtta = cant * precioCtta;
     const dif = totCtta - totRenova;
@@ -341,7 +368,7 @@ function recalcCategoria(catIdx) {
         const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
         const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
         if (cant <= 0) return;
-        const precioCtta = parseFloat(row.querySelector('.inp-precio').value) || 0;
+        const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
         subRenova += cant * it.p;
         subCtta += cant * precioCtta;
     });
@@ -366,7 +393,7 @@ function recalcTotalGeneral() {
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
             const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
             if (cant <= 0) return;
-            const precioCtta = parseFloat(row.querySelector('.inp-precio').value) || 0;
+            const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
             totalRenova += cant * it.p;
             totalCtta += cant * precioCtta;
         });
@@ -392,7 +419,7 @@ function agregarItemLibre(catIdx) {
     const desc = addRow.querySelector('.inp-libre-desc').value.trim();
     const unidad = addRow.querySelector('.inp-libre-unidad').value.trim() || 'UN';
     const cant = parseFloat(addRow.querySelector('.inp-libre-cant').value) || 0;
-    const precio = parseFloat(addRow.querySelector('.inp-libre-precio').value) || 0;
+    const precio = parsePrecio(addRow.querySelector('.inp-libre-precio').value);
     if (!desc || cant <= 0) {
         alert('Completá al menos la descripción y la cantidad del ítem libre.');
         return;
@@ -418,7 +445,7 @@ function agregarItemLibre(catIdx) {
         <td class="text-right"><input type="number" min="0" step="0.5" class="input-num inp-cant" value="${cant}" oninput="recalcFilaLibre(${catIdx},${id})"></td>
         <td class="text-right">${fmtMoney(0)}</td>
         <td class="text-right cell-totrenova">${fmtMoney(0)}</td>
-        <td class="text-right"><input type="text" inputmode="decimal" class="input-num inp-precio" value="${precio || ''}" placeholder="Ingrese valor" oninput="recalcFilaLibre(${catIdx},${id})"></td>
+        <td class="text-right"><input type="text" inputmode="decimal" class="input-num inp-precio" value="${precio || ''}" placeholder="Ingrese valor" oninput="recalcFilaLibre(${catIdx},${id})" onblur="reformatearPrecio(this)"></td>
         <td class="text-right cell-totctta">${fmtMoney(0)}</td>
         <td class="text-right cell-dif">${fmtMoneyColor(0)}</td>
         <td class="text-center"><button class="btn-quitar" onclick="quitarItemLibre(${catIdx},${id})" title="Quitar ítem">✕</button></td>
@@ -432,7 +459,7 @@ function recalcFilaLibre(catIdx, id) {
     const item = (customItems[catIdx] || []).find(i => i.id === id);
     if (!tr || !item) return;
     const cant = parseFloat(tr.querySelector('.inp-cant').value) || 0;
-    const precio = parseFloat(tr.querySelector('.inp-precio').value) || 0;
+    const precio = parsePrecio(tr.querySelector('.inp-precio').value);
     item.cant = cant;
     item.precio = precio;
     const totCtta = cant * precio;
@@ -589,8 +616,23 @@ function aplicarEstado(estado) {
 // ============================================================
 // EXPORTAR A EXCEL (mismo formato/lógica de MOI que la app Nota de Venta)
 // ============================================================
+function validarAntesDeExportar() {
+    const faltantes = [];
+    if (!val('fProyecto')) faltantes.push('Proyecto');
+    if (!val('fCliente')) faltantes.push('Cliente');
+    if (!val('fNombreProveedor')) faltantes.push('Nombre Proveedor');
+    if (!hayDatosIngresados()) faltantes.push('al menos un ítem cotizado (cantidad > 0)');
+    return faltantes;
+}
+
 async function exportarExcel() {
     if (typeof ExcelJS === 'undefined') { alert('Librería ExcelJS no cargada'); return; }
+
+    const faltantes = validarAntesDeExportar();
+    if (faltantes.length > 0) {
+        alert('Antes de exportar completá:\n- ' + faltantes.join('\n- '));
+        return;
+    }
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('COTIZACION');
@@ -685,7 +727,7 @@ async function exportarExcel() {
             const cant = cantidades[itIdx];
             if (cant <= 0) return;
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
-            const precioCtta = parseFloat(row.querySelector('.inp-precio').value) || 0;
+            const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
             const totRenova = cant * it.p;
             const totCtta = cant * precioCtta;
             const dif = totCtta - totRenova;
