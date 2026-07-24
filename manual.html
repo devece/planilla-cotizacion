@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Uso - Planilla de Cotización Abastible</title>
+<style>
+    :root {
+        --aba-orange: #FE5100;
+        --aba-orange-dark: #E04E00;
+        --aba-orange-light: #FEF2E8;
+        --aba-blue: #001489;
+        --aba-blue-dark: #00106E;
+        --aba-blue-light: #EBEEF9;
+        --aba-gray: #54585A;
+        --aba-silver: #F8F8F8;
+        --aba-border: #E5E7EB;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; background: var(--aba-silver); margin: 0; color: #1f2937; }
+    .wrap { max-width: 880px; margin: 0 auto; padding: 0 20px 60px; }
+    header.top { background: #fff; border-bottom: 1px solid var(--aba-border); box-shadow: 0 1px 2px rgba(0,0,0,.04); margin-bottom: 30px; }
+    header.top .inner { max-width: 880px; margin: 0 auto; padding: 16px 20px; display: flex; align-items: center; gap: 14px; justify-content: space-between; flex-wrap: wrap; }
+    header.top .brand { display: flex; align-items: center; gap: 12px; }
+    header.top img { height: 48px; width: auto; }
+    header.top h1 { font-size: 18px; margin: 0; color: var(--aba-blue); }
+    header.top .sub { font-size: 12px; color: var(--aba-gray); margin-top: 2px; }
+    .back-link { font-size: 13px; font-weight: 600; color: var(--aba-blue); text-decoration: none; border: 1px solid var(--aba-border); border-radius: 8px; padding: 8px 14px; background: #fff; white-space: nowrap; }
+    .back-link:hover { background: var(--aba-blue-light); }
+
+    .intro { background: #fff; border: 1px solid var(--aba-border); border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; }
+    .intro p { margin: 0; line-height: 1.6; font-size: 14px; color: #374151; }
+
+    .toc { background: var(--aba-blue-light); border-radius: 12px; padding: 16px 24px; margin-bottom: 36px; }
+    .toc div { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--aba-blue); margin-bottom: 8px; }
+    .toc ol { margin: 0; padding-left: 20px; font-size: 14px; }
+    .toc li { margin-bottom: 4px; }
+    .toc a { color: var(--aba-blue); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    section.step { margin-bottom: 44px; }
+    .step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .step-num { background: var(--aba-orange); color: #fff; font-weight: 800; font-size: 15px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .step-head h2 { font-size: 17px; margin: 0; color: var(--aba-blue); }
+    section.step p.desc { font-size: 14px; line-height: 1.65; color: #374151; margin: 0 0 14px 44px; }
+    section.step ul { margin: 0 0 14px 44px; padding-left: 18px; font-size: 14px; line-height: 1.65; color: #374151; }
+    .shot { margin-left: 44px; border: 1px solid var(--aba-border); border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .shot img { display: block; width: 100%; height: auto; }
+    .note { margin: 14px 0 0 44px; font-size: 12.5px; background: var(--aba-orange-light); color: var(--aba-orange-dark); border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+
+    footer { text-align: center; font-size: 12px; color: var(--aba-gray); margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<header class="top">
+    <div class="inner">
+        <div class="brand">
+            <img src="assets/abastible-logo.png" alt="Abastible">
+            <div>
+                <h1>Manual de Uso</h1>
+                <div class="sub">Planilla de Cotización</div>
+            </div>
+        </div>
+        <a class="back-link" href="Planilla_Cotizacion.html">← Volver a la planilla</a>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <div class="intro">
+        <p>Esta guía explica paso a paso cómo usar la Planilla de Cotización: elegir el centro, completar los datos del proyecto y del contratista, ingresar cantidades y precios por ítem, revisar el resumen y exportar la cotización a Excel.</p>
+    </div>
+
+    <div class="toc">
+        <div>Contenido</div>
+        <ol>
+            <li><a href="#paso1">Selecciona el centro</a></li>
+            <li><a href="#paso2">Completa los datos del proyecto y del contratista</a></li>
+            <li><a href="#paso3">Ingresa cantidades y precio del contratista por ítem</a></li>
+            <li><a href="#paso4">Agrega ítems libres (fuera de catálogo)</a></li>
+            <li><a href="#paso5">Revisa el resumen (Base Renova + MOI = Total Contratista)</a></li>
+            <li><a href="#paso6">Exporta a Excel o imprime</a></li>
+        </ol>
+    </div>
+
+    <section class="step" id="paso1">
+        <div class="step-head"><div class="step-num">1</div><h2>Selecciona el centro</h2></div>
+        <p class="desc">Al abrir la planilla aparece un cuadro para elegir el centro (planta u oficina de ventas) con el que vas a cotizar. Esto determina los precios base Renova que se van a usar en toda la planilla.</p>
+        <div class="shot"><img src="assets/manual/01-seleccionar-centro.png" alt="Selección de centro al abrir la planilla"></div>
+        <div class="note">⚠️ Si cambias de centro más adelante y ya ingresaste cantidades o precios, la planilla te va a pedir confirmación porque se borran los datos cargados.</div>
+    </section>
+
+    <section class="step" id="paso2">
+        <div class="step-head"><div class="step-num">2</div><h2>Completa los datos del proyecto y del contratista</h2></div>
+        <p class="desc">Completa los campos de identificación: proyecto, número de proyecto, cliente, RUT, dirección, centro y fecha. Luego completa los datos del contratista: número de proveedor, nombre, contacto y teléfono. Estos datos se incluyen en el Excel exportado.</p>
+        <div class="shot"><img src="assets/manual/02-datos-proyecto.png" alt="Formulario de datos del proyecto y del contratista"></div>
+    </section>
+
+    <section class="step" id="paso3">
+        <div class="step-head"><div class="step-num">3</div><h2>Ingresa cantidades y precio del contratista por ítem</h2></div>
+        <p class="desc">Los ítems están agrupados por categoría (por ejemplo Cañerías, Servicio Cañerías, Conexiones, Obras Civiles, Normalizaciones). Para cada ítem que necesites cotizar:</p>
+        <ul>
+            <li>Ingresa la <b>cantidad</b> en la columna "Cant."</li>
+            <li>Ingresa el <b>precio ofrecido por el contratista</b> en la columna "Precio Contratista"</li>
+            <li>La planilla calcula automáticamente el Total Renova, el Total Contratista y la <b>Diferencia</b> (en rojo si el contratista cobra menos que Renova, en naranjo si cobra más)</li>
+        </ul>
+        <p class="desc" style="margin-top:-6px;">Las categorías de cañerías (AP/MP/BP) tienen precio fijo al catálogo Renova y no se editan: son "CATÁLOGO A PRECIO FIJO RENOVA".</p>
+        <div class="shot"><img src="assets/manual/03-ingresar-items.png" alt="Tabla de ítems con cantidades, precios y diferencias"></div>
+        <div class="note">🔎 Usa el buscador general o el buscador de cada categoría para encontrar un ítem por código o descripción rápidamente.</div>
+    </section>
+
+    <section class="step" id="paso4">
+        <div class="step-head"><div class="step-num">4</div><h2>Agrega ítems libres (fuera de catálogo)</h2></div>
+        <p class="desc">Si necesitas cotizar algo que no está en el catálogo, usa la fila "LIBRE" al final de cada categoría: escribe la descripción, la unidad, la cantidad y el precio, y presiona "+ Agregar". El ítem libre se suma al subtotal de esa categoría igual que los demás.</p>
+        <div class="shot"><img src="assets/manual/04-item-libre.png" alt="Fila para agregar un ítem libre fuera de catálogo"></div>
+    </section>
+
+    <section class="step" id="paso5">
+        <div class="step-head"><div class="step-num">5</div><h2>Revisa el resumen</h2></div>
+        <p class="desc">El panel de Resumen, arriba de la tabla, se actualiza en tiempo real con el Total Base Renova, el Total de Mano de Obra Industrial (MOI, la diferencia acumulada) y el Total Contratista. Siempre se cumple: Base Renova + MOI = Total Contratista.</p>
+        <div class="shot"><img src="assets/manual/05-resumen.png" alt="Panel de resumen con totales"></div>
+    </section>
+
+    <section class="step" id="paso6">
+        <div class="step-head"><div class="step-num">6</div><h2>Exporta a Excel o imprime</h2></div>
+        <p class="desc">Cuando termines de cotizar, usa los botones de la parte superior derecha:</p>
+        <ul>
+            <li><b>📊 Exportar a Excel</b>: genera un archivo con el detalle completo de la cotización, listo para enviar o archivar.</li>
+            <li><b>🖨️ Imprimir</b>: abre el diálogo de impresión del navegador para imprimir o guardar como PDF.</li>
+        </ul>
+        <div class="shot"><img src="assets/manual/06-exportar.png" alt="Botones de exportar a Excel e imprimir"></div>
+    </section>
+
+</div>
+
+<footer>Manual de Uso · Planilla de Cotización Abastible</footer>
+
+</body>
+</html>
