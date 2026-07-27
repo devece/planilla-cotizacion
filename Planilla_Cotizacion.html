@@ -313,7 +313,7 @@ function construirTablas() {
                 <td></td>
             </tr>`;
         });
-        html += `
+        if (!esFijo) { html += `
                         <tr class="add-row" data-cat="${catIdx}">
                             <td class="text-xs" style="color:var(--aba-gray);">LIBRE</td>
                             <td><input type="text" class="input-text-libre inp-libre-desc" placeholder="Descripción del ítem libre"></td>
@@ -325,7 +325,8 @@ function construirTablas() {
                             <td></td>
                             <td></td>
                             <td class="text-center"><button class="btn-agregar-libre" onclick="agregarItemLibre(${catIdx})">+ Agregar</button></td>
-                        </tr>
+                        </tr>`; }
+        html += `
                     </tbody>
                     <tfoot>
                         <tr class="subtotal-row"><td colspan="5" class="text-right">SUBTOTAL ${cat}</td><td class="text-right" id="subRenova${catIdx}">${fmtMoney(0)}</td><td></td><td class="text-right" id="subContratista${catIdx}">${fmtMoney(0)}</td><td class="text-right" id="subDif${catIdx}">${fmtMoneyColor(0)}</td><td></td></tr>
