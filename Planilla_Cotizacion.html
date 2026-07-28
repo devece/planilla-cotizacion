@@ -83,6 +83,7 @@
             <input type="file" id="inputCargarCotizacion" accept="application/json" style="display:none" onchange="cargarCotizacionArchivo(this)">
             <button onclick="document.getElementById('inputCargarCotizacion').click()" class="btn-secondary">📂 Cargar cotización</button>
             <button onclick="guardarCotizacion()" class="btn-secondary">💾 Guardar cotización</button>
+            <button onclick="limpiarDatos()" class="btn-secondary">🧹 Limpiar datos</button>
             <button onclick="exportarExcel()" class="btn-primary">📊 Exportar a Excel</button>
             <button onclick="window.print()" class="btn-secondary">🖨️ Imprimir</button>
         </div>
@@ -222,6 +223,20 @@ function cambiarCentro(nuevoCentro) {
     customItems = {};
     nextCustomId = 1;
     document.getElementById('buscador').value = '';
+    construirTablas();
+    recalcTotalGeneral();
+}
+
+const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion'];
+const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fTelefono'];
+
+function limpiarDatos() {
+    if (!confirm('Esto borra el proyecto, el contratista y todas las cantidades/precios ingresados, manteniendo el centro actual. ¿Continuar?')) return;
+    CAMPOS_PROYECTO.concat(CAMPOS_CONTRATISTA).forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('buscador').value = '';
+    customItems = {};
+    nextCustomId = 1;
     construirTablas();
     recalcTotalGeneral();
 }
@@ -568,12 +583,16 @@ function cargarCotizacionArchivo(input) {
     input.value = '';
 }
 
+function normalizarCentro(s) { return String(s || '').normalize('NFC').trim(); }
+
 function aplicarEstado(estado) {
-    if (!estado || !estado.centro || !BASE_BY_CENTRO[estado.centro]) {
+    const centroBuscado = estado && normalizarCentro(estado.centro);
+    const centroKey = centroBuscado && Object.keys(BASE_BY_CENTRO).find(k => normalizarCentro(k) === centroBuscado);
+    if (!estado || !estado.centro || !centroKey) {
         alert('El archivo no corresponde a un centro válido o la base de datos actual no lo incluye.');
         return;
     }
-    CENTRO = estado.centro;
+    CENTRO = centroKey;
     BASE = BASE_BY_CENTRO[CENTRO];
     ORDEN_CATS = Object.keys(BASE);
     customItems = {};
