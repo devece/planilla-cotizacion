@@ -129,10 +129,12 @@
         <p class="desc">La planilla no guarda nada en un servidor: todo lo que cargás vive únicamente en la pestaña abierta. Para no perder tu trabajo o para seguir cotizando desde otro equipo, usa los botones de la parte superior derecha:</p>
         <ul>
             <li><b>💾 Guardar cotización</b>: descarga un archivo <code>.json</code> con todo lo cargado (datos de proyecto, contratista, cantidades, precios e ítems libres).</li>
-            <li><b>📂 Cargar cotización</b>: lee un archivo <code>.json</code> guardado antes y reconstruye la cotización completa, incluido el centro correcto.</li>
+            <li><b>📂 Cargar cotización</b>: lee un archivo <code>.json</code> guardado antes con "💾 Guardar cotización" y reconstruye la cotización completa, incluido el centro correcto.</li>
+            <li><b>🧹 Limpiar datos</b>: borra el proyecto, el contratista, las cantidades/precios y los ítems libres para empezar un presupuesto nuevo, manteniendo el centro seleccionado (no hace falta recargar la página).</li>
         </ul>
         <div class="note">📤 Para retomar una cotización en otro dispositivo o compartirla con un colega, enviá ese archivo <code>.json</code> por correo o chat y cargalo del otro lado con "📂 Cargar cotización".</div>
-        <div class="note">⚠️ Cargar un archivo reemplaza los datos que tengas en pantalla; si hay cantidades o precios cargados, la planilla pide confirmación antes de continuar.</div>
+        <div class="note">⚠️ Cargar un archivo reemplaza los datos que tengas en pantalla; si hay cantidades o precios cargados, la planilla pide confirmación antes de continuar. Lo mismo pasa con "🧹 Limpiar datos": pide confirmación antes de borrar.</div>
+        <div class="note">❗ "📂 Cargar cotización" solo acepta archivos <code>.json</code> generados por el botón "💾 Guardar cotización" de esta misma planilla. Archivos de otras herramientas (por ejemplo, de la app Nota de Venta) tienen una estructura distinta y muestran el error "El archivo no corresponde a un centro válido...".</div>
     </section>
 
     <section class="step" id="paso7">
