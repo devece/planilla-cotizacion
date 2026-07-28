@@ -568,12 +568,16 @@ function cargarCotizacionArchivo(input) {
     input.value = '';
 }
 
+function normalizarCentro(s) { return String(s || '').normalize('NFC').trim(); }
+
 function aplicarEstado(estado) {
-    if (!estado || !estado.centro || !BASE_BY_CENTRO[estado.centro]) {
+    const centroBuscado = estado && normalizarCentro(estado.centro);
+    const centroKey = centroBuscado && Object.keys(BASE_BY_CENTRO).find(k => normalizarCentro(k) === centroBuscado);
+    if (!estado || !estado.centro || !centroKey) {
         alert('El archivo no corresponde a un centro válido o la base de datos actual no lo incluye.');
         return;
     }
-    CENTRO = estado.centro;
+    CENTRO = centroKey;
     BASE = BASE_BY_CENTRO[CENTRO];
     ORDEN_CATS = Object.keys(BASE);
     customItems = {};
