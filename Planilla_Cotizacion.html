@@ -183,7 +183,8 @@
 </div>
 
 <script>
-// Categorías cuyo precio contratista es fijo = Precio Base Renova (no se edita, no genera MOI)
+// Categorías cuyo precio contratista es fijo para sus ítems de catálogo.
+// Los ítems libres agregados a estas categorías sí generan MOI.
 const CATS_PRECIO_FIJO = ['CAÑERIAS AP', 'CAÑERIAS MP', 'CAÑERIAS BP'];
 
 // Ítems de base_datos.xlsx agrupados por centro (código, descripción, unidad, precio).
@@ -293,7 +294,7 @@ function construirTablas() {
                     </tbody>
                     <tfoot>
                         <tr class="subtotal-row"><td colspan="5" class="text-right">SUBTOTAL ${cat}</td><td class="text-right" id="subRenova${catIdx}">${fmtMoney(0)}</td><td></td><td class="text-right" id="subContratista${catIdx}">${fmtMoney(0)}</td><td class="text-right" id="subDif${catIdx}">${fmtMoneyColor(0)}</td><td></td></tr>
-                        ${esFijo ? '' : `<tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${cat})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>`}
+                        <tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${cat})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>
                     </tfoot>
                 </table>
                 </div>
@@ -626,7 +627,7 @@ async function exportarExcel() {
         });
         r++;
 
-        if (dif !== 0 && !esFijo) {
+        if (dif !== 0) {
             sheet.mergeCells(r, 1, r, 7);
             const moiLbl = sheet.getCell(r, 1);
             moiLbl.value = '🛠️ MANO DE OBRA INDUSTRIAL — ' + cat;
