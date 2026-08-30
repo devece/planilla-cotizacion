@@ -85,6 +85,7 @@
             <button onclick="guardarCotizacion()" class="btn-secondary">💾 Guardar cotización</button>
             <button onclick="limpiarDatos()" class="btn-secondary">🧹 Limpiar datos</button>
             <button onclick="exportarExcel()" class="btn-primary">📊 Exportar a Excel</button>
+            <button onclick="enviarOC()" class="btn-primary" style="background: var(--aba-blue);">📧 Enviar OC</button>
             <button onclick="window.print()" class="btn-secondary">🖨️ Imprimir</button>
         </div>
     </div>
@@ -165,6 +166,10 @@
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Teléfono</label>
                 <input id="fTelefono" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Teléfono de contacto">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Correo Contratista</label>
+                <input id="fCorreoProveedor" type="email" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="correo@contratista.cl">
             </div>
         </div>
     </div>
@@ -247,7 +252,7 @@ function cambiarCentro(nuevoCentro) {
 }
 
 const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion'];
-const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fTelefono'];
+const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fTelefono', 'fCorreoProveedor'];
 
 function limpiarDatos() {
     if (!confirm('Esto borra el proyecto, el contratista y todas las cantidades/precios ingresados, manteniendo el centro actual. ¿Continuar?')) return;
@@ -605,7 +610,7 @@ function recopilarEstado() {
         version: 1,
         centro: CENTRO,
         proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha'), fVigenciaDias: val('fVigenciaDias') },
-        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fTelefono: val('fTelefono') },
+        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fTelefono: val('fTelefono'), fCorreoProveedor: val('fCorreoProveedor') },
         items, libres
     };
 }
@@ -970,6 +975,7 @@ async function cargarContratistas() {
                 razonSocial,
                 contacto: String(fila['Nombre representante'] ?? '').trim(),
                 telefono: String(fila['Telefono'] ?? '').trim(),
+                correo: String(fila['Correo Electronico'] ?? '').trim(),
             });
         });
     });
@@ -988,6 +994,48 @@ function autocompletarContratista(codigo) {
     document.getElementById('fNombreProveedor').value = c.razonSocial;
     document.getElementById('fContacto').value = c.contacto;
     document.getElementById('fTelefono').value = c.telefono;
+    document.getElementById('fCorreoProveedor').value = c.correo;
+}
+
+// ============================================================
+// ENVÍO DE OC POR CORREO
+// ============================================================
+// Abre el cliente de correo por defecto (mailto:) con destinatario, asunto y cuerpo
+// prellenados, pidiendo al contratista los datos de fechas/plazos de ejecución.
+// La OC (Excel/PDF) hay que adjuntarla a mano: mailto: no permite adjuntar archivos
+// por seguridad del navegador.
+function enviarOC() {
+    const proyecto = val('fProyecto');
+    const numeroProyecto = val('fNumeroProyecto');
+    const contacto = val('fContacto');
+    const correo = val('fCorreoProveedor');
+
+    if (!proyecto) { alert('Ingresá el Proyecto antes de enviar la OC.'); return; }
+    if (!correo) { alert('Ingresá el Correo del Contratista antes de enviar la OC (o elegí un Número de Proveedor con correo registrado).'); return; }
+
+    const asuntoProyecto = numeroProyecto ? `${proyecto} - N° ${numeroProyecto}` : proyecto;
+    const asunto = `OC ${asuntoProyecto}`;
+
+    const saludo = contacto ? `Estimado(a) ${contacto}` : 'Estimado(a)';
+    const cuerpo = [
+        saludo,
+        '',
+        `Adjunto OC correspondiente a Proyecto ${asuntoProyecto}.`,
+        '',
+        'Indicar:',
+        '',
+        '- Fecha Inicio de Trabajos: ',
+        '- Fecha termino trabajos: ',
+        '- Plazo de ejecución: ',
+        '- Fecha de necesidad de cañerías si corresponde (incluir dirección): ',
+        '- Fecha de necesidad de envío de tanque si corresponde (incluir dirección): ',
+        '',
+        '',
+        'Saludos cordiales',
+    ].join('\n');
+
+    const mailto = `mailto:${encodeURIComponent(correo)}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+    window.location.href = mailto;
 }
 
 // Categorías que no se cotizan en la Cotización Libre aunque existan en base_datos.xlsx
