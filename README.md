@@ -8,6 +8,7 @@ Repositorio independiente, extraído de [nota-de-venta-abastible](https://github
 
 - `Planilla_Cotizacion.html` — aplicación (una sola página, sin backend).
 - `base_datos.xlsx` — base de precios por centro/categoría. La app la carga con `fetch()` al abrir la página; para actualizar precios basta con reemplazar este archivo (misma estructura de columnas: `descripción`, `código`, `categoria`, `unidad_medida`, `centro`, `precio`; una hoja por categoría).
+- `contratistas.xlsx` — listado de contratistas (columnas `Código Proveedor`, `Rut`, `Razón Social`, `Nombre representante`, `Zona`, `Jefe de Proyectos`, `Correo Electronico`, `Telefono`; una o más hojas). La app la carga con `fetch()` y usa sólo los registros de la zona `Norte Grande` (constante `ZONA_APP` en `Planilla_Cotizacion.html`) para autocompletar Nombre/Contacto/Teléfono al ingresar el N° de Proveedor.
 - `libs/exceljs.min.js` — librería usada para exportar la cotización a Excel.
 
 ## Despliegue

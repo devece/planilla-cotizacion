@@ -128,7 +128,19 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Fecha</label>
-                <input id="fFecha" type="date" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);">
+                <input id="fFecha" type="date" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" onchange="actualizarVigencia()">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Vigencia de la cotización</label>
+                <select id="fVigenciaDias" onchange="actualizarVigencia()" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);">
+                    <option value="15">15 días</option>
+                    <option value="30" selected>30 días</option>
+                    <option value="45">45 días</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Válida hasta</label>
+                <input id="fVigenciaHasta" type="text" readonly class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border); background: var(--aba-silver); color: var(--aba-gray);">
             </div>
         </div>
     </div>
@@ -139,7 +151,8 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Número Proveedor</label>
-                <input id="fNumeroProveedor" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor">
+                <input id="fNumeroProveedor" type="text" list="dlContratistas" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor" oninput="autocompletarContratista(this.value)">
+                <datalist id="dlContratistas"></datalist>
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Nombre Proveedor</label>
@@ -195,6 +208,11 @@
 // Los ítems libres agregados a estas categorías sí generan MOI.
 const CATS_PRECIO_FIJO = ['CAÑERIAS AP', 'CAÑERIAS MP', 'CAÑERIAS BP'];
 
+// Normalizaciones no puede llevar MOI propio: la diferencia Renova/Contratista de esta
+// categoría se traslada y se suma como si fuera un ítem libre más del MOI de Obras Civiles.
+const CAT_NORMALIZACIONES = 'NORMALIZACIONES';
+const CAT_OBRAS_CIVILES = 'OBRAS CIVILES';
+
 // Ítems de base_datos.xlsx agrupados por centro (código, descripción, unidad, precio).
 // Se cargan de forma asíncrona al abrir la página — ver cargarBaseDatos() más abajo.
 let BASE_BY_CENTRO = {};
@@ -235,11 +253,25 @@ function limpiarDatos() {
     if (!confirm('Esto borra el proyecto, el contratista y todas las cantidades/precios ingresados, manteniendo el centro actual. ¿Continuar?')) return;
     CAMPOS_PROYECTO.concat(CAMPOS_CONTRATISTA).forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('fVigenciaDias').value = '30';
+    actualizarVigencia();
     document.getElementById('buscador').value = '';
     customItems = {};
     nextCustomId = 1;
     construirTablas();
     recalcTotalGeneral();
+}
+
+// Calcula "Válida hasta" = Fecha + días de vigencia elegidos, y lo muestra en formato es-CL.
+function actualizarVigencia() {
+    const fechaStr = document.getElementById('fFecha').value;
+    const dias = parseInt(document.getElementById('fVigenciaDias').value, 10) || 0;
+    const destino = document.getElementById('fVigenciaHasta');
+    if (!fechaStr) { destino.value = ''; return; }
+    const [y, m, d] = fechaStr.split('-').map(Number);
+    const fecha = new Date(y, m - 1, d);
+    fecha.setDate(fecha.getDate() + dias);
+    destino.value = fecha.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function fmt(n) {
@@ -346,7 +378,9 @@ function construirTablas() {
                     </tbody>
                     <tfoot>
                         <tr class="subtotal-row"><td colspan="5" class="text-right">SUBTOTAL ${cat}</td><td class="text-right" id="subRenova${catIdx}">${fmtMoney(0)}</td><td></td><td class="text-right" id="subContratista${catIdx}">${fmtMoney(0)}</td><td class="text-right" id="subDif${catIdx}">${fmtMoneyColor(0)}</td><td></td></tr>
-                        <tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${cat})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>
+                        ${cat === CAT_NORMALIZACIONES
+                            ? `<tr class="moi-row"><td colspan="9" class="text-right" style="font-style:italic;">ℹ️ Normalizaciones no genera MOI propio: su diferencia se traslada como ítem libre a OBRAS CIVILES</td></tr>`
+                            : `<tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${cat})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>`}
                     </tfoot>
                 </table>
                 </div>
@@ -377,12 +411,15 @@ function recalcFila(catIdx, itIdx) {
     recalcTotalGeneral();
 }
 
-function recalcCategoria(catIdx) {
+// Subtotal Renova/Contratista/Diferencia de una categoría, calculado desde sus datos
+// (no desde las celdas ya pintadas), para poder usarlo también al calcular otra categoría.
+function calcularSubtotalCategoria(catIdx) {
     const cat = ORDEN_CATS[catIdx];
-    const items = BASE[cat];
+    const items = BASE[cat] || [];
     let subRenova = 0, subCtta = 0;
     items.forEach((it, itIdx) => {
         const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+        if (!row) return;
         const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
         if (cant <= 0) return;
         const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
@@ -390,14 +427,34 @@ function recalcCategoria(catIdx) {
         subCtta += cant * precioCtta;
     });
     (customItems[catIdx] || []).forEach(item => {
-        if (item.cant > 0) {
-            subCtta += item.cant * item.precio;
-        }
+        if (item.cant > 0) subCtta += item.cant * item.precio;
     });
-    const dif = subCtta - subRenova; // = suma de las Diferencias por ítem; el MOI es este mismo valor
+    return { subRenova, subCtta, dif: subCtta - subRenova };
+}
+
+// El MOI de Obras Civiles incluye su propia diferencia más la de Normalizaciones: esta última
+// no puede llevar MOI propio, así que su diferencia se trata como un ítem libre de Obras Civiles.
+function recalcMoiObrasCiviles() {
+    const catIdxOC = ORDEN_CATS.indexOf(CAT_OBRAS_CIVILES);
+    if (catIdxOC === -1) return;
+    const difOC = calcularSubtotalCategoria(catIdxOC).dif;
+    const catIdxNorm = ORDEN_CATS.indexOf(CAT_NORMALIZACIONES);
+    const difNorm = catIdxNorm !== -1 ? calcularSubtotalCategoria(catIdxNorm).dif : 0;
+    const moiCell = document.getElementById('moi' + catIdxOC);
+    if (moiCell) moiCell.innerHTML = fmtMoneyColor(difOC + difNorm);
+}
+
+function recalcCategoria(catIdx) {
+    const cat = ORDEN_CATS[catIdx];
+    const { subRenova, subCtta, dif } = calcularSubtotalCategoria(catIdx);
     document.getElementById('subRenova' + catIdx).innerHTML = fmtMoney(subRenova);
     document.getElementById('subContratista' + catIdx).innerHTML = fmtMoney(subCtta);
     document.getElementById('subDif' + catIdx).innerHTML = fmtMoneyColor(dif);
+
+    if (cat === CAT_NORMALIZACIONES || cat === CAT_OBRAS_CIVILES) {
+        recalcMoiObrasCiviles();
+        return;
+    }
     const moiCell = document.getElementById('moi' + catIdx);
     if (moiCell) moiCell.innerHTML = fmtMoneyColor(dif);
 }
@@ -547,7 +604,7 @@ function recopilarEstado() {
     return {
         version: 1,
         centro: CENTRO,
-        proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha') },
+        proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha'), fVigenciaDias: val('fVigenciaDias') },
         contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fTelefono: val('fTelefono') },
         items, libres
     };
@@ -604,6 +661,7 @@ function aplicarEstado(estado) {
 
     Object.entries(estado.proyecto || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
     Object.entries(estado.contratista || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
+    actualizarVigencia();
 
     (estado.items || []).forEach(({ cat, codigo, cant, precio }) => {
         const catIdx = ORDEN_CATS.indexOf(cat);
@@ -686,6 +744,8 @@ async function exportarExcel() {
         ['DIRECCIÓN', document.getElementById('fDireccion').value || '-'],
         ['CENTRO', CENTRO],
         ['FECHA', document.getElementById('fFecha').value || '-'],
+        ['VIGENCIA', (document.getElementById('fVigenciaDias').value || '-') + ' días'],
+        ['VÁLIDA HASTA', document.getElementById('fVigenciaHasta').value || '-'],
         ['N° PROVEEDOR', document.getElementById('fNumeroProveedor').value || '-'],
         ['NOMBRE PROVEEDOR', document.getElementById('fNombreProveedor').value || '-'],
         ['CONTACTO', document.getElementById('fContacto').value || '-'],
@@ -721,6 +781,13 @@ async function exportarExcel() {
 
     let totalGeneralRenova = 0, totalGeneralContratista = 0;
 
+    // Diferencia propia de cada categoría, calculada antes de recorrerlas: Obras Civiles aparece
+    // antes que Normalizaciones en el libro y necesita conocer de antemano la diferencia de esta
+    // última para incluirla en su propio MOI (Normalizaciones no puede llevar MOI propio).
+    const difPropiaPorCategoria = ORDEN_CATS.map((cat, catIdx) => calcularSubtotalCategoria(catIdx).dif);
+    const catIdxNormalizaciones = ORDEN_CATS.indexOf(CAT_NORMALIZACIONES);
+    const catIdxObrasCiviles = ORDEN_CATS.indexOf(CAT_OBRAS_CIVILES);
+
     ORDEN_CATS.forEach((cat, catIdx) => {
         const items = BASE[cat];
         if (!items || items.length === 0) return;
@@ -732,7 +799,10 @@ async function exportarExcel() {
             return parseFloat(row.querySelector('.inp-cant').value) || 0;
         });
         const librosCat = (customItems[catIdx] || []).filter(item => item.cant > 0);
-        const huboItems = cantidades.some(c => c > 0) || librosCat.length > 0;
+        let huboItems = cantidades.some(c => c > 0) || librosCat.length > 0;
+        if (catIdx === catIdxObrasCiviles && catIdxNormalizaciones !== -1 && difPropiaPorCategoria[catIdxNormalizaciones] !== 0) {
+            huboItems = true; // Obras Civiles debe imprimirse igual si sólo Normalizaciones generó diferencia
+        }
         if (!huboItems) return;
 
         // Fila de categoría (encabezado de grupo)
@@ -806,7 +876,13 @@ async function exportarExcel() {
         });
         r++;
 
-        if (dif !== 0) {
+        // Normalizaciones no lleva MOI propio: no se imprime su fila de MOI, su diferencia ya
+        // quedó sumada al MOI de Obras Civiles (ver difParaMoi más abajo).
+        let difParaMoi = dif;
+        if (catIdx === catIdxObrasCiviles && catIdxNormalizaciones !== -1) {
+            difParaMoi = dif + difPropiaPorCategoria[catIdxNormalizaciones];
+        }
+        if (cat !== CAT_NORMALIZACIONES && difParaMoi !== 0) {
             sheet.mergeCells(r, 1, r, 7);
             const moiLbl = sheet.getCell(r, 1);
             moiLbl.value = '🛠️ MANO DE OBRA INDUSTRIAL — ' + cat;
@@ -818,7 +894,7 @@ async function exportarExcel() {
                 cell.fill = fillSolid(C.orangeL);
                 cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.orange } };
                 cell.alignment = { horizontal: 'right', vertical: 'middle' };
-                if (col === 8) { cell.value = dif; cell.numFmt = MONEY; }
+                if (col === 8) { cell.value = difParaMoi; cell.numFmt = MONEY; }
             });
             r++;
         }
@@ -863,6 +939,55 @@ async function exportarExcel() {
     link.href = URL.createObjectURL(blob);
     link.download = `COTIZACION_LIBRE_${centroArchivo}_${proyecto.replace(/\s+/g, '_')}.xlsx`;
     link.click();
+}
+
+// Jefe de Proyectos de contratistas.xlsx a cargo de los centros que cotiza esta app.
+// En el archivo aparece con variantes ("Fdo. Videla", "Fernando Videla "), por eso se
+// matchea por apellido en minúsculas en vez de comparar el nombre completo exacto.
+const JEFE_PROYECTOS_APP = 'videla';
+let CONTRATISTAS = [];
+
+// Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo los
+// contratistas a cargo del Jefe de Proyectos que corresponde a esta app, para poder
+// autocompletar Nombre/Contacto/Teléfono a partir del Número de Proveedor.
+async function cargarContratistas() {
+    const res = await fetch('contratistas.xlsx');
+    if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
+    const buffer = await res.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+
+    const lista = [];
+    workbook.SheetNames.forEach(nombreHoja => {
+        const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
+        filas.forEach(fila => {
+            const jefe = String(fila['Jefe de Proyectos'] ?? '').trim().toLowerCase();
+            if (!jefe.includes(JEFE_PROYECTOS_APP)) return;
+            const codigo = String(fila['Código Proveedor'] ?? '').trim();
+            const razonSocial = String(fila['Razón Social'] ?? '').trim();
+            if (!codigo || !razonSocial) return;
+            lista.push({
+                codigo,
+                razonSocial,
+                contacto: String(fila['Nombre representante'] ?? '').trim(),
+                telefono: String(fila['Telefono'] ?? '').trim(),
+            });
+        });
+    });
+    return lista;
+}
+
+function poblarDatalistContratistas() {
+    const dl = document.getElementById('dlContratistas');
+    dl.innerHTML = CONTRATISTAS.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razonSocial)}</option>`).join('');
+}
+
+// Al ingresar/elegir un Número de Proveedor que coincide con la lista, autocompleta el resto.
+function autocompletarContratista(codigo) {
+    const c = CONTRATISTAS.find(x => x.codigo === String(codigo).trim());
+    if (!c) return;
+    document.getElementById('fNombreProveedor').value = c.razonSocial;
+    document.getElementById('fContacto').value = c.contacto;
+    document.getElementById('fTelefono').value = c.telefono;
 }
 
 // Categorías que no se cotizan en la Cotización Libre aunque existan en base_datos.xlsx
@@ -911,6 +1036,16 @@ function confirmarCentroInicial() {
 
 (async function iniciar() {
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+    actualizarVigencia();
+
+    // La lista de contratistas es un "nice to have": si falla su carga no debe impedir cotizar.
+    try {
+        CONTRATISTAS = await cargarContratistas();
+        poblarDatalistContratistas();
+    } catch (e) {
+        console.warn('No se pudo cargar contratistas.xlsx:', e.message);
+    }
+
     const sel = document.getElementById('selCentroInicial');
     const btn = document.getElementById('btnComenzar');
     try {
