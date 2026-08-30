@@ -151,7 +151,8 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Número Proveedor</label>
-                <input id="fNumeroProveedor" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor">
+                <input id="fNumeroProveedor" type="text" list="dlContratistas" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor" oninput="autocompletarContratista(this.value)">
+                <datalist id="dlContratistas"></datalist>
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Nombre Proveedor</label>
@@ -940,6 +941,53 @@ async function exportarExcel() {
     link.click();
 }
 
+// Zona de contratistas.xlsx que corresponde a los centros que cotiza esta app (todos zona norte).
+const ZONA_APP = 'Norte Grande';
+let CONTRATISTAS = [];
+
+// Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo la zona
+// que corresponde a esta app, para poder autocompletar Nombre/Contacto/Teléfono a partir
+// del Número de Proveedor.
+async function cargarContratistas() {
+    const res = await fetch('contratistas.xlsx');
+    if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
+    const buffer = await res.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+
+    const lista = [];
+    workbook.SheetNames.forEach(nombreHoja => {
+        const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
+        filas.forEach(fila => {
+            const zona = String(fila['Zona'] ?? '').trim();
+            if (zona !== ZONA_APP) return;
+            const codigo = String(fila['Código Proveedor'] ?? '').trim();
+            const razonSocial = String(fila['Razón Social'] ?? '').trim();
+            if (!codigo || !razonSocial) return;
+            lista.push({
+                codigo,
+                razonSocial,
+                contacto: String(fila['Nombre representante'] ?? '').trim(),
+                telefono: String(fila['Telefono'] ?? '').trim(),
+            });
+        });
+    });
+    return lista;
+}
+
+function poblarDatalistContratistas() {
+    const dl = document.getElementById('dlContratistas');
+    dl.innerHTML = CONTRATISTAS.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razonSocial)}</option>`).join('');
+}
+
+// Al ingresar/elegir un Número de Proveedor que coincide con la lista, autocompleta el resto.
+function autocompletarContratista(codigo) {
+    const c = CONTRATISTAS.find(x => x.codigo === String(codigo).trim());
+    if (!c) return;
+    document.getElementById('fNombreProveedor').value = c.razonSocial;
+    document.getElementById('fContacto').value = c.contacto;
+    document.getElementById('fTelefono').value = c.telefono;
+}
+
 // Categorías que no se cotizan en la Cotización Libre aunque existan en base_datos.xlsx
 const CATS_EXCLUIDAS = ['EQUIPO COMPRA DIRECTA', 'SERVICIO COMPRA DIRECTA'];
 
@@ -987,6 +1035,15 @@ function confirmarCentroInicial() {
 (async function iniciar() {
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
     actualizarVigencia();
+
+    // La lista de contratistas es un "nice to have": si falla su carga no debe impedir cotizar.
+    try {
+        CONTRATISTAS = await cargarContratistas();
+        poblarDatalistContratistas();
+    } catch (e) {
+        console.warn('No se pudo cargar contratistas.xlsx:', e.message);
+    }
+
     const sel = document.getElementById('selCentroInicial');
     const btn = document.getElementById('btnComenzar');
     try {
