@@ -941,13 +941,15 @@ async function exportarExcel() {
     link.click();
 }
 
-// Zona de contratistas.xlsx que corresponde a los centros que cotiza esta app (todos zona norte).
-const ZONA_APP = 'Norte Grande';
+// Jefe de Proyectos de contratistas.xlsx a cargo de los centros que cotiza esta app.
+// En el archivo aparece con variantes ("Fdo. Videla", "Fernando Videla "), por eso se
+// matchea por apellido en minúsculas en vez de comparar el nombre completo exacto.
+const JEFE_PROYECTOS_APP = 'videla';
 let CONTRATISTAS = [];
 
-// Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo la zona
-// que corresponde a esta app, para poder autocompletar Nombre/Contacto/Teléfono a partir
-// del Número de Proveedor.
+// Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo los
+// contratistas a cargo del Jefe de Proyectos que corresponde a esta app, para poder
+// autocompletar Nombre/Contacto/Teléfono a partir del Número de Proveedor.
 async function cargarContratistas() {
     const res = await fetch('contratistas.xlsx');
     if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
@@ -958,8 +960,8 @@ async function cargarContratistas() {
     workbook.SheetNames.forEach(nombreHoja => {
         const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
         filas.forEach(fila => {
-            const zona = String(fila['Zona'] ?? '').trim();
-            if (zona !== ZONA_APP) return;
+            const jefe = String(fila['Jefe de Proyectos'] ?? '').trim().toLowerCase();
+            if (!jefe.includes(JEFE_PROYECTOS_APP)) return;
             const codigo = String(fila['Código Proveedor'] ?? '').trim();
             const razonSocial = String(fila['Razón Social'] ?? '').trim();
             if (!codigo || !razonSocial) return;
