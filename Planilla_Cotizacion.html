@@ -121,13 +121,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Centro</label>
-                <select id="fCentro" onchange="cambiarCentro(this.value)" disabled class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);">
-                    <option value="Planta Antofagasta">Planta Antofagasta</option>
-                    <option value="Oficina Ventas Arica">Oficina Ventas Arica</option>
-                    <option value="Oficina Ventas Calama">Oficina Ventas Calama</option>
-                    <option value="Oficina Ventas Copiapó">Oficina Ventas Copiapó</option>
-                    <option value="Planta Iquique">Planta Iquique</option>
-                </select>
+                <div id="fCentro" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border); background: var(--aba-silver); color: var(--aba-blue); font-weight: 600;"></div>
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Fecha</label>
@@ -281,21 +275,6 @@ let nextCustomId = 1;
 function hayDatosIngresados() {
     return Object.values(customItems).some(arr => arr && arr.length > 0)
         || Array.from(document.querySelectorAll('tr.row .inp-cant')).some(inp => parseFloat(inp.value) > 0);
-}
-
-function cambiarCentro(nuevoCentro) {
-    if (hayDatosIngresados() && !confirm('Cambiar de centro borra las cantidades y precios ya ingresados. ¿Continuar?')) {
-        document.getElementById('fCentro').value = CENTRO;
-        return;
-    }
-    CENTRO = nuevoCentro;
-    BASE = BASE_BY_CENTRO[CENTRO];
-    ORDEN_CATS = Object.keys(BASE);
-    customItems = {};
-    nextCustomId = 1;
-    document.getElementById('buscador').value = '';
-    construirTablas();
-    recalcTotalGeneral();
 }
 
 const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion'];
@@ -743,8 +722,7 @@ function aplicarEstado(estado) {
     ORDEN_CATS = Object.keys(BASE);
     customItems = {};
     nextCustomId = 1;
-    document.getElementById('fCentro').value = CENTRO;
-    document.getElementById('fCentro').disabled = false;
+    document.getElementById('fCentro').textContent = CENTRO;
     construirTablas();
 
     Object.entries(estado.proyecto || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
@@ -1170,8 +1148,7 @@ function confirmarCentroInicial() {
     CENTRO = sel.value;
     BASE = BASE_BY_CENTRO[CENTRO] || {};
     ORDEN_CATS = Object.keys(BASE);
-    document.getElementById('fCentro').value = CENTRO;
-    document.getElementById('fCentro').disabled = false;
+    document.getElementById('fCentro').textContent = CENTRO;
     construirTablas();
     recalcTotalGeneral();
     document.getElementById('modalCentro').remove();
