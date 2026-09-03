@@ -728,6 +728,7 @@ function aplicarEstado(estado) {
     customItems = {};
     nextCustomId = 1;
     document.getElementById('fCentro').textContent = CENTRO;
+    filtrarContratistasPorCentro();
     construirTablas();
 
     Object.entries(estado.proyecto || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
@@ -1034,15 +1035,31 @@ async function exportarExcel() {
     link.click();
 }
 
-// Jefe de Proyectos de contratistas.xlsx a cargo de los centros que cotiza esta app.
-// En el archivo aparece con variantes ("Fdo. Videla", "Fernando Videla "), por eso se
-// matchea por apellido en minúsculas en vez de comparar el nombre completo exacto.
-const JEFE_PROYECTOS_APP = 'videla';
+// Jefe de Proyectos a cargo de cada centro, según jefes_de_proyecto_por_region.xlsx (Jefe de
+// Proyectos por región de Chile). En contratistas.xlsx el nombre aparece con variantes ("Fdo.
+// Videla", "Fernando Videla ", "M. Estay"), por eso se matchea por apellido en minúsculas.
+const CENTRO_JEFE_PROYECTOS = {
+    'Planta Iquique':               'videla', // Región de Tarapacá
+    'Planta Antofagasta':           'videla', // Región de Antofagasta
+    'Oficina Ventas Copiapó':       'videla', // Región de Atacama
+    'Oficina Ventas Arica':         'videla', // Región de Arica y Parinacota
+    'Planta el Peñón':              'ho',     // Región Metropolitana
+    'Planta Con-Con':               'ho',     // Región de Valparaíso
+    'Planta Maipú':                 'ho',     // Región Metropolitana
+    'Oficina Ventas San Fernando':  'berr',   // Región del Libertador Bernardo O'Higgins
+    'Planta Talca':                 'berr',   // Región del Maule
+    'Planta Lenga':                 'nuñez',  // Región del Biobío
+    'Oficina Ventas Temuco':        'nuñez',  // Región de La Araucanía
+    'Planta Osorno':                'estay',  // Región de Los Lagos
+    'Oficina Ventas Valdivia':      'estay',  // Región de Los Ríos
+};
+
+let CONTRATISTAS_TODOS = [];
 let CONTRATISTAS = [];
 
-// Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo los
-// contratistas a cargo del Jefe de Proyectos que corresponde a esta app, para poder
-// autocompletar Nombre/Contacto/Correo/Teléfono a partir del Número de Proveedor o la Razón Social.
+// Descarga y parsea contratistas.xlsx (mismo directorio del sitio) con todos los contratistas,
+// sin filtrar por Jefe de Proyectos todavía (el centro, del que depende el jefe, se elige recién
+// en el modal inicial). Ver filtrarContratistasPorCentro().
 async function cargarContratistas() {
     const res = await fetch('contratistas.xlsx');
     if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
@@ -1053,8 +1070,6 @@ async function cargarContratistas() {
     workbook.SheetNames.forEach(nombreHoja => {
         const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
         filas.forEach(fila => {
-            const jefe = String(fila['Jefe de Proyectos'] ?? '').trim().toLowerCase();
-            if (!jefe.includes(JEFE_PROYECTOS_APP)) return;
             const codigo = String(fila['Código Proveedor'] ?? '').trim();
             const razonSocial = String(fila['Razón Social'] ?? '').trim();
             if (!codigo || !razonSocial) return;
@@ -1064,10 +1079,20 @@ async function cargarContratistas() {
                 contacto: String(fila['Nombre representante'] ?? '').trim(),
                 correo: String(fila['Correo Electronico'] ?? '').trim(),
                 telefono: String(fila['Telefono'] ?? '').trim(),
+                jefe: String(fila['Jefe de Proyectos'] ?? '').trim().toLowerCase(),
             });
         });
     });
     return lista;
+}
+
+// Filtra CONTRATISTAS_TODOS al Jefe de Proyectos del centro activo y repuebla los datalist.
+// Se llama al confirmar el centro inicial y al cargar una cotización guardada (puede traer
+// un centro distinto al que ya estaba activo).
+function filtrarContratistasPorCentro() {
+    const jefe = CENTRO_JEFE_PROYECTOS[CENTRO];
+    CONTRATISTAS = jefe ? CONTRATISTAS_TODOS.filter(c => c.jefe.includes(jefe)) : [];
+    poblarDatalistContratistas();
 }
 
 function poblarDatalistContratistas() {
@@ -1171,6 +1196,7 @@ function confirmarCentroInicial() {
     BASE = BASE_BY_CENTRO[CENTRO] || {};
     ORDEN_CATS = Object.keys(BASE);
     document.getElementById('fCentro').textContent = CENTRO;
+    filtrarContratistasPorCentro();
     construirTablas();
     recalcTotalGeneral();
     document.getElementById('modalCentro').remove();
@@ -1181,9 +1207,9 @@ function confirmarCentroInicial() {
     actualizarVigencia();
 
     // La lista de contratistas es un "nice to have": si falla su carga no debe impedir cotizar.
+    // Se filtra por Jefe de Proyectos recién al confirmar el centro (ver filtrarContratistasPorCentro).
     try {
-        CONTRATISTAS = await cargarContratistas();
-        poblarDatalistContratistas();
+        CONTRATISTAS_TODOS = await cargarContratistas();
     } catch (e) {
         console.warn('No se pudo cargar contratistas.xlsx:', e.message);
     }
