@@ -145,7 +145,7 @@
     <!-- Datos del contratista -->
     <div class="bg-white rounded-lg border p-4 mb-5" style="border-color: var(--aba-border);">
         <div class="text-xs font-bold uppercase mb-3" style="color: var(--aba-orange-dark);">🛠️ Datos del contratista</div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Número Proveedor</label>
                 <input id="fNumeroProveedor" type="text" list="dlContratistas" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor" oninput="autocompletarContratista(this.value)">
@@ -153,11 +153,16 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Nombre Proveedor</label>
-                <input id="fNombreProveedor" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Razón social contratista">
+                <input id="fNombreProveedor" type="text" list="dlContratistasNombres" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Razón social contratista" oninput="autocompletarContratista(this.value)">
+                <datalist id="dlContratistasNombres"></datalist>
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Contacto</label>
                 <input id="fContacto" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del contacto">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Correo</label>
+                <input id="fCorreo" type="email" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Correo de contacto">
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Teléfono</label>
@@ -278,7 +283,7 @@ function hayDatosIngresados() {
 }
 
 const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion'];
-const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fTelefono'];
+const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fCorreo', 'fTelefono'];
 
 function limpiarDatos() {
     if (!confirm('Esto borra el proyecto, el contratista y todas las cantidades/precios ingresados, manteniendo el centro actual. ¿Continuar?')) return;
@@ -672,7 +677,7 @@ function recopilarEstado() {
         version: 1,
         centro: CENTRO,
         proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha'), fVigenciaDias: val('fVigenciaDias') },
-        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fTelefono: val('fTelefono') },
+        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fCorreo: val('fCorreo'), fTelefono: val('fTelefono') },
         items, libres
     };
 }
@@ -815,6 +820,7 @@ async function exportarExcel() {
         ['N° PROVEEDOR', document.getElementById('fNumeroProveedor').value || '-'],
         ['NOMBRE PROVEEDOR', document.getElementById('fNombreProveedor').value || '-'],
         ['CONTACTO', document.getElementById('fContacto').value || '-'],
+        ['CORREO', document.getElementById('fCorreo').value || '-'],
         ['TELÉFONO', document.getElementById('fTelefono').value || '-'],
     ];
     let r = 2;
@@ -1036,7 +1042,7 @@ let CONTRATISTAS = [];
 
 // Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo los
 // contratistas a cargo del Jefe de Proyectos que corresponde a esta app, para poder
-// autocompletar Nombre/Contacto/Teléfono a partir del Número de Proveedor.
+// autocompletar Nombre/Contacto/Correo/Teléfono a partir del Número de Proveedor o la Razón Social.
 async function cargarContratistas() {
     const res = await fetch('contratistas.xlsx');
     if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
@@ -1056,6 +1062,7 @@ async function cargarContratistas() {
                 codigo,
                 razonSocial,
                 contacto: String(fila['Nombre representante'] ?? '').trim(),
+                correo: String(fila['Correo Electronico'] ?? '').trim(),
                 telefono: String(fila['Telefono'] ?? '').trim(),
             });
         });
@@ -1064,17 +1071,32 @@ async function cargarContratistas() {
 }
 
 function poblarDatalistContratistas() {
-    const dl = document.getElementById('dlContratistas');
-    dl.innerHTML = CONTRATISTAS.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razonSocial)}</option>`).join('');
+    document.getElementById('dlContratistas').innerHTML =
+        CONTRATISTAS.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razonSocial)}</option>`).join('');
+    document.getElementById('dlContratistasNombres').innerHTML =
+        CONTRATISTAS.map(c => `<option value="${escapeHtml(c.razonSocial)}"></option>`).join('');
 }
 
-// Al ingresar/elegir un Número de Proveedor que coincide con la lista, autocompleta el resto.
-function autocompletarContratista(codigo) {
-    const c = CONTRATISTAS.find(x => x.codigo === String(codigo).trim());
+// Antepone +56 al teléfono si aún no lo trae (contratistas.xlsx guarda la mayoría como
+// 9 dígitos sin prefijo, y algunos ya vienen formateados con +56).
+function formatearTelefonoCL(tel) {
+    const digitos = String(tel || '').replace(/\D/g, '');
+    if (!digitos) return '';
+    return '+' + (digitos.startsWith('56') ? digitos : '56' + digitos);
+}
+
+// Al ingresar/elegir un Número de Proveedor o una Razón Social que coincide con la lista,
+// autocompleta el resto (código, nombre, contacto, correo y teléfono).
+function autocompletarContratista(valor) {
+    const v = String(valor || '').trim().toLowerCase();
+    if (!v) return;
+    const c = CONTRATISTAS.find(x => x.codigo.toLowerCase() === v || x.razonSocial.toLowerCase() === v);
     if (!c) return;
+    document.getElementById('fNumeroProveedor').value = c.codigo;
     document.getElementById('fNombreProveedor').value = c.razonSocial;
     document.getElementById('fContacto').value = c.contacto;
-    document.getElementById('fTelefono').value = c.telefono;
+    document.getElementById('fCorreo').value = c.correo;
+    document.getElementById('fTelefono').value = formatearTelefonoCL(c.telefono);
 }
 
 // Categorías que no se cotizan en la Cotización Libre aunque existan en base_datos.xlsx
