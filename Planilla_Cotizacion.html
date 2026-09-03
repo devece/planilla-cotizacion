@@ -47,6 +47,9 @@
     tr.row-libre td { background: #FFFBEB; }
     tr.row-libre:hover td { background: var(--aba-orange-light); }
     .badge-libre { font-size: 10px; background: var(--aba-orange-light); color: var(--aba-orange-dark); padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-left: 4px; }
+    tr.row-impovar td { background: #FEF3C7; color: #78350F; font-size: 12px; }
+    tr.row-impovar:hover td { background: #FDE68A; }
+    .badge-impovar { font-size: 10px; background: #FDE68A; color: #92400E; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-left: 4px; }
     .input-text-libre { border: 1px solid var(--aba-border); border-radius: 6px; padding: 4px 6px; width: 100%; }
     .btn-quitar { color: #DC2626; background: none; border: none; cursor: pointer; font-size: 16px; line-height: 1; }
     .btn-quitar:hover { color: #991B1B; }
@@ -118,13 +121,7 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Centro</label>
-                <select id="fCentro" onchange="cambiarCentro(this.value)" disabled class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);">
-                    <option value="Planta Antofagasta">Planta Antofagasta</option>
-                    <option value="Oficina Ventas Arica">Oficina Ventas Arica</option>
-                    <option value="Oficina Ventas Calama">Oficina Ventas Calama</option>
-                    <option value="Oficina Ventas Copiapó">Oficina Ventas Copiapó</option>
-                    <option value="Planta Iquique">Planta Iquique</option>
-                </select>
+                <div id="fCentro" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border); background: var(--aba-silver); color: var(--aba-blue); font-weight: 600;"></div>
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Fecha</label>
@@ -148,7 +145,7 @@
     <!-- Datos del contratista -->
     <div class="bg-white rounded-lg border p-4 mb-5" style="border-color: var(--aba-border);">
         <div class="text-xs font-bold uppercase mb-3" style="color: var(--aba-orange-dark);">🛠️ Datos del contratista</div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Número Proveedor</label>
                 <input id="fNumeroProveedor" type="text" list="dlContratistas" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor" oninput="autocompletarContratista(this.value)">
@@ -156,11 +153,16 @@
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Nombre Proveedor</label>
-                <input id="fNombreProveedor" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Razón social contratista">
+                <input id="fNombreProveedor" type="text" list="dlContratistasNombres" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Razón social contratista" oninput="autocompletarContratista(this.value)">
+                <datalist id="dlContratistasNombres"></datalist>
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Contacto</label>
                 <input id="fContacto" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del contacto">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Correo</label>
+                <input id="fCorreo" type="email" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Correo de contacto">
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Teléfono</label>
@@ -217,6 +219,41 @@ const CAT_OBRAS_CIVILES = 'OBRAS CIVILES';
 // Se cargan de forma asíncrona al abrir la página — ver cargarBaseDatos() más abajo.
 let BASE_BY_CENTRO = {};
 
+// Material de cañería Impovar (impovar.xlsx), agrupado por categoría: { 'CAÑERIAS AP': [{codigo,desc,diametro,precioML}], ... }
+// impovar.xlsx no trae columna centro, por lo que el material es el mismo para todos los centros.
+// Se carga de forma asíncrona al abrir la página — ver cargarImpovar() más abajo.
+let IMPOVAR_BY_CAT = {};
+
+// Impovar cotiza la cañería por TIRA (barra de 6 metros): misma lógica que la app Nota de Venta.
+const ML_POR_TIRA = 6;
+
+// Extrae el diámetro (sin comillas, ej: '1 1/2', '3/8', '4') de una descripción de cañería,
+// para vincular el material Impovar (que solo trae descripción, no columna diametro) con el
+// diámetro ya normalizado de base_datos.xlsx.
+function extraerDiametroDesc(desc) {
+    const m = String(desc || '').trim().match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+)\s*["'´′]?\s*$/);
+    return m ? m[1].replace(/\s+/g, ' ').trim() : null;
+}
+
+// Metros de material a pedir: cantidad instalada × 1.05 redondeado al múltiplo de 6 superior
+// (tira completa). Si la cantidad ya es múltiplo exacto de 6, se pide esa misma cantidad.
+function calcularMetrosMaterial(metros) {
+    if (metros % ML_POR_TIRA === 0) return metros;
+    return Math.ceil((metros * 1.05) / ML_POR_TIRA) * ML_POR_TIRA;
+}
+
+// Material Impovar correspondiente a un ítem de instalación de cañería (mismo diámetro,
+// misma categoría AP/MP/BP), con la cantidad de ML ya calculada. null si no aplica.
+function obtenerMaterialImpovar(cat, it, cant) {
+    if (!CATS_PRECIO_FIJO.includes(cat) || !cant || cant <= 0) return null;
+    const diametro = it.diam || extraerDiametroDesc(it.d);
+    if (!diametro) return null;
+    const mat = (IMPOVAR_BY_CAT[cat] || []).find(m => m.diametro === diametro);
+    if (!mat) return null;
+    const metros = calcularMetrosMaterial(cant);
+    return { codigo: mat.codigo, desc: mat.desc, metros, precioML: mat.precioML, total: metros * mat.precioML };
+}
+
 const CENTROS = [
     'Planta Iquique',
     'Planta Antofagasta',
@@ -245,23 +282,8 @@ function hayDatosIngresados() {
         || Array.from(document.querySelectorAll('tr.row .inp-cant')).some(inp => parseFloat(inp.value) > 0);
 }
 
-function cambiarCentro(nuevoCentro) {
-    if (hayDatosIngresados() && !confirm('Cambiar de centro borra las cantidades y precios ya ingresados. ¿Continuar?')) {
-        document.getElementById('fCentro').value = CENTRO;
-        return;
-    }
-    CENTRO = nuevoCentro;
-    BASE = BASE_BY_CENTRO[CENTRO];
-    ORDEN_CATS = Object.keys(BASE);
-    customItems = {};
-    nextCustomId = 1;
-    document.getElementById('buscador').value = '';
-    construirTablas();
-    recalcTotalGeneral();
-}
-
 const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion'];
-const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fTelefono'];
+const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fCorreo', 'fTelefono'];
 
 function limpiarDatos() {
     if (!confirm('Esto borra el proyecto, el contratista y todas las cantidades/precios ingresados, manteniendo el centro actual. ¿Continuar?')) return;
@@ -421,8 +443,40 @@ function recalcFila(catIdx, itIdx) {
     row.querySelector('.cell-totctta').innerHTML = fmtMoney(totCtta);
     row.querySelector('.cell-dif').innerHTML = fmtMoneyColor(dif);
     row.classList.toggle('has-qty', cant > 0);
+    actualizarSubfilaImpovar(catIdx, itIdx, row, it, cant);
     recalcCategoria(catIdx);
     recalcTotalGeneral();
+}
+
+// Agrega/actualiza/quita la subfila de material Impovar bajo un ítem de instalación de cañería.
+// El material se cotiza al mismo precio en Renova y Contratista (pass-through, sin MOI propio).
+function actualizarSubfilaImpovar(catIdx, itIdx, row, it, cant) {
+    const cat = ORDEN_CATS[catIdx];
+    let sub = document.querySelector(`tr.row-impovar[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+    const material = obtenerMaterialImpovar(cat, it, cant);
+    if (!material) {
+        if (sub) sub.remove();
+        return;
+    }
+    if (!sub) {
+        sub = document.createElement('tr');
+        sub.className = 'row-impovar';
+        sub.dataset.cat = catIdx;
+        sub.dataset.it = itIdx;
+        row.parentNode.insertBefore(sub, row.nextSibling);
+    }
+    sub.innerHTML = `
+        <td class="text-xs">${escapeHtml(material.codigo.replace(/^0+/, '') || '-')}</td>
+        <td>🏭 ${escapeHtml(material.desc)}<span class="badge-impovar">MATERIAL IMPOVAR</span></td>
+        <td class="text-center">ML</td>
+        <td class="text-right">${material.metros}</td>
+        <td class="text-right">${fmtMoney(material.precioML)}</td>
+        <td class="text-right">${fmtMoney(material.total)}</td>
+        <td class="text-right">${fmtMoney(material.precioML)}</td>
+        <td class="text-right">${fmtMoney(material.total)}</td>
+        <td class="text-right">${fmtMoneyColor(0)}</td>
+        <td></td>
+    `;
 }
 
 // Subtotal Renova/Contratista/Diferencia de una categoría, calculado desde sus datos
@@ -439,6 +493,8 @@ function calcularSubtotalCategoria(catIdx) {
         const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
         subRenova += cant * it.p;
         subCtta += cant * precioCtta;
+        const material = obtenerMaterialImpovar(cat, it, cant);
+        if (material) { subRenova += material.total; subCtta += material.total; }
     });
     (customItems[catIdx] || []).forEach(item => {
         if (item.cant > 0) subCtta += item.cant * item.precio;
@@ -484,6 +540,8 @@ function recalcTotalGeneral() {
             const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
             totalRenova += cant * it.p;
             totalCtta += cant * precioCtta;
+            const material = obtenerMaterialImpovar(cat, it, cant);
+            if (material) { totalRenova += material.total; totalCtta += material.total; }
         });
         (customItems[catIdx] || []).forEach(item => {
             if (item.cant > 0) {
@@ -619,7 +677,7 @@ function recopilarEstado() {
         version: 1,
         centro: CENTRO,
         proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha'), fVigenciaDias: val('fVigenciaDias') },
-        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fTelefono: val('fTelefono') },
+        contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fCorreo: val('fCorreo'), fTelefono: val('fTelefono') },
         items, libres
     };
 }
@@ -669,8 +727,7 @@ function aplicarEstado(estado) {
     ORDEN_CATS = Object.keys(BASE);
     customItems = {};
     nextCustomId = 1;
-    document.getElementById('fCentro').value = CENTRO;
-    document.getElementById('fCentro').disabled = false;
+    document.getElementById('fCentro').textContent = CENTRO;
     construirTablas();
 
     Object.entries(estado.proyecto || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
@@ -763,6 +820,7 @@ async function exportarExcel() {
         ['N° PROVEEDOR', document.getElementById('fNumeroProveedor').value || '-'],
         ['NOMBRE PROVEEDOR', document.getElementById('fNombreProveedor').value || '-'],
         ['CONTACTO', document.getElementById('fContacto').value || '-'],
+        ['CORREO', document.getElementById('fCorreo').value || '-'],
         ['TELÉFONO', document.getElementById('fTelefono').value || '-'],
     ];
     let r = 2;
@@ -851,6 +909,27 @@ async function exportarExcel() {
                 else cell.alignment = { horizontal: 'left', vertical: 'middle' };
             });
             r++;
+
+            // Material Impovar vinculado automáticamente a este ítem de instalación de cañería:
+            // pass-through al mismo precio en Renova y Contratista (diferencia 0, sin MOI propio).
+            const material = obtenerMaterialImpovar(cat, it, cant);
+            if (material) {
+                subRenova += material.total;
+                subCtta += material.total;
+                const filaMat = [material.codigo.replace(/^0+/, '') || '-', '🏭 ' + material.desc + ' (MATERIAL IMPOVAR)', 'ML', material.metros, material.precioML, material.total, material.precioML, material.total, 0];
+                filaMat.forEach((v, i) => {
+                    const col = i + 1;
+                    const cell = sheet.getCell(r, col);
+                    cell.value = v;
+                    cell.border = gridBorder();
+                    cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: 'FF92400E' } };
+                    cell.fill = fillSolid('FFFEF3C7');
+                    if ([5, 6, 7, 8, 9].includes(col)) { cell.numFmt = MONEY; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
+                    else if (col === 4) cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    else cell.alignment = { horizontal: 'left', vertical: 'middle' };
+                });
+                r++;
+            }
         });
 
         librosCat.forEach(item => {
@@ -963,7 +1042,7 @@ let CONTRATISTAS = [];
 
 // Descarga y parsea contratistas.xlsx (mismo directorio del sitio), filtrando sólo los
 // contratistas a cargo del Jefe de Proyectos que corresponde a esta app, para poder
-// autocompletar Nombre/Contacto/Teléfono a partir del Número de Proveedor.
+// autocompletar Nombre/Contacto/Correo/Teléfono a partir del Número de Proveedor o la Razón Social.
 async function cargarContratistas() {
     const res = await fetch('contratistas.xlsx');
     if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
@@ -983,6 +1062,7 @@ async function cargarContratistas() {
                 codigo,
                 razonSocial,
                 contacto: String(fila['Nombre representante'] ?? '').trim(),
+                correo: String(fila['Correo Electronico'] ?? '').trim(),
                 telefono: String(fila['Telefono'] ?? '').trim(),
             });
         });
@@ -991,17 +1071,32 @@ async function cargarContratistas() {
 }
 
 function poblarDatalistContratistas() {
-    const dl = document.getElementById('dlContratistas');
-    dl.innerHTML = CONTRATISTAS.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razonSocial)}</option>`).join('');
+    document.getElementById('dlContratistas').innerHTML =
+        CONTRATISTAS.map(c => `<option value="${escapeHtml(c.codigo)}">${escapeHtml(c.razonSocial)}</option>`).join('');
+    document.getElementById('dlContratistasNombres').innerHTML =
+        CONTRATISTAS.map(c => `<option value="${escapeHtml(c.razonSocial)}"></option>`).join('');
 }
 
-// Al ingresar/elegir un Número de Proveedor que coincide con la lista, autocompleta el resto.
-function autocompletarContratista(codigo) {
-    const c = CONTRATISTAS.find(x => x.codigo === String(codigo).trim());
+// Antepone +56 al teléfono si aún no lo trae (contratistas.xlsx guarda la mayoría como
+// 9 dígitos sin prefijo, y algunos ya vienen formateados con +56).
+function formatearTelefonoCL(tel) {
+    const digitos = String(tel || '').replace(/\D/g, '');
+    if (!digitos) return '';
+    return '+' + (digitos.startsWith('56') ? digitos : '56' + digitos);
+}
+
+// Al ingresar/elegir un Número de Proveedor o una Razón Social que coincide con la lista,
+// autocompleta el resto (código, nombre, contacto, correo y teléfono).
+function autocompletarContratista(valor) {
+    const v = String(valor || '').trim().toLowerCase();
+    if (!v) return;
+    const c = CONTRATISTAS.find(x => x.codigo.toLowerCase() === v || x.razonSocial.toLowerCase() === v);
     if (!c) return;
+    document.getElementById('fNumeroProveedor').value = c.codigo;
     document.getElementById('fNombreProveedor').value = c.razonSocial;
     document.getElementById('fContacto').value = c.contacto;
-    document.getElementById('fTelefono').value = c.telefono;
+    document.getElementById('fCorreo').value = c.correo;
+    document.getElementById('fTelefono').value = formatearTelefonoCL(c.telefono);
 }
 
 // Categorías que no se cotizan en la Cotización Libre aunque existan en base_datos.xlsx
@@ -1027,12 +1122,46 @@ async function cargarBaseDatos() {
             const precio = Number(fila['precio']) || 0;
             if (!centro || !codigo || !descripcion || precio <= 0) return;
 
+            const diam = String(fila['diametro'] ?? '').trim() || null;
+
             if (!porCentro[centro]) porCentro[centro] = {};
             if (!porCentro[centro][nombreHoja]) porCentro[centro][nombreHoja] = [];
-            porCentro[centro][nombreHoja].push({ c: codigo, d: descripcion, u: unidad, p: precio });
+            porCentro[centro][nombreHoja].push({ c: codigo, d: descripcion, u: unidad, p: precio, diam });
         });
     });
     return porCentro;
+}
+
+// Descarga y parsea impovar.xlsx (planilla trimestral nativa de Impovar, mismo directorio del
+// sitio): 1 sola hoja "MATERIAL CAÑERIAS", categoría en la columna CATEGORIA ("CATEGORIA AP" /
+// "CATEGORIA MP Y BP" — mismo material para MP y BP), precio ya calculado por metro en
+// "PRECIO POR METRO [CLP/Mt.]". impovar.xlsx no trae columna centro: el material es el mismo
+// para todos los centros.
+async function cargarImpovar() {
+    const res = await fetch('impovar.xlsx');
+    if (!res.ok) throw new Error(`impovar.xlsx no encontrada (HTTP ${res.status})`);
+    const buffer = await res.arrayBuffer();
+    const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+
+    const porCat = { 'CAÑERIAS AP': [], 'CAÑERIAS MP': [], 'CAÑERIAS BP': [] };
+    workbook.SheetNames.forEach(nombreHoja => {
+        const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
+        filas.forEach(fila => {
+            const codigo = String(fila['CODIGO'] ?? '').trim();
+            const desc = String(fila['DESCRIPCIÓN'] ?? '').trim();
+            const precioML = Number(fila['PRECIO POR METRO [CLP/Mt.]']) || 0;
+            if (!codigo || !desc || precioML <= 0) return;
+            const diametro = extraerDiametroDesc(desc);
+            if (!diametro) return;
+
+            const categoriaRaw = String(fila['CATEGORIA'] ?? '').toUpperCase();
+            const categoriasDestino = categoriaRaw.includes('AP') ? ['CAÑERIAS AP']
+                : (categoriaRaw.includes('MP') || categoriaRaw.includes('BP')) ? ['CAÑERIAS MP', 'CAÑERIAS BP']
+                : [];
+            categoriasDestino.forEach(cat => porCat[cat].push({ codigo, desc, diametro, precioML }));
+        });
+    });
+    return porCat;
 }
 
 function confirmarCentroInicial() {
@@ -1041,8 +1170,7 @@ function confirmarCentroInicial() {
     CENTRO = sel.value;
     BASE = BASE_BY_CENTRO[CENTRO] || {};
     ORDEN_CATS = Object.keys(BASE);
-    document.getElementById('fCentro').value = CENTRO;
-    document.getElementById('fCentro').disabled = false;
+    document.getElementById('fCentro').textContent = CENTRO;
     construirTablas();
     recalcTotalGeneral();
     document.getElementById('modalCentro').remove();
@@ -1058,6 +1186,14 @@ function confirmarCentroInicial() {
         poblarDatalistContratistas();
     } catch (e) {
         console.warn('No se pudo cargar contratistas.xlsx:', e.message);
+    }
+
+    // El material Impovar también es "nice to have": si falla su carga, las cañerías se pueden
+    // seguir cotizando igual, solo que sin el material agregado automáticamente.
+    try {
+        IMPOVAR_BY_CAT = await cargarImpovar();
+    } catch (e) {
+        console.warn('No se pudo cargar impovar.xlsx (no se agregará material de cañerías automáticamente):', e.message);
     }
 
     const sel = document.getElementById('selCentroInicial');
