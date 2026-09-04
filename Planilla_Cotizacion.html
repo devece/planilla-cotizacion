@@ -416,6 +416,8 @@ function construirTablas() {
                         <tr class="subtotal-row"><td colspan="5" class="text-right">SUBTOTAL ${cat}</td><td class="text-right" id="subRenova${catIdx}">${fmtMoney(0)}</td><td></td><td class="text-right" id="subContratista${catIdx}">${fmtMoney(0)}</td><td class="text-right" id="subDif${catIdx}">${fmtMoneyColor(0)}</td><td></td></tr>
                         ${cat === CAT_NORMALIZACIONES
                             ? `<tr class="moi-row"><td colspan="9" class="text-right" style="font-style:italic;">ℹ️ Normalizaciones no genera MOI propio: su diferencia se traslada como ítem libre a OBRAS CIVILES</td></tr>`
+                            : esFijo
+                            ? ''
                             : `<tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${cat})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>`}
                     </tfoot>
                 </table>
@@ -976,7 +978,7 @@ async function exportarExcel() {
         if (catIdx === catIdxObrasCiviles && catIdxNormalizaciones !== -1) {
             difParaMoi = dif + difPropiaPorCategoria[catIdxNormalizaciones];
         }
-        if (cat !== CAT_NORMALIZACIONES && difParaMoi !== 0) {
+        if (cat !== CAT_NORMALIZACIONES && !esFijo && difParaMoi !== 0) {
             sheet.mergeCells(r, 1, r, 7);
             const moiLbl = sheet.getCell(r, 1);
             moiLbl.value = '🛠️ MANO DE OBRA INDUSTRIAL — ' + cat;
