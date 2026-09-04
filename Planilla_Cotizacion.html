@@ -269,6 +269,25 @@ const CENTROS = [
     'Planta Osorno',
     'Oficina Ventas Valdivia',
 ];
+// Nombre de región que se muestra al usuario en vez del nombre real del centro (que se sigue
+// usando internamente como clave para buscar los datos en base_datos.xlsx).
+const CENTRO_REGION = {
+    'Planta Iquique':              'I - Iquique',
+    'Planta Antofagasta':          'II - Antofagasta',
+    'Oficina Ventas Copiapó':      'III - Copiapó',
+    'Oficina Ventas Arica':        'XV - Arica',
+    'Planta el Peñón':             'IV - La Serena',
+    'Planta Con-Con':              'V - Valparaíso',
+    'Planta Maipú':                'RM - Santiago',
+    'Oficina Ventas San Fernando': 'VI - Rancagua',
+    'Planta Talca':                'VII - Talca',
+    'Planta Lenga':                'VIII - Concepción, XVI - Ñuble',
+    'Oficina Ventas Temuco':       'IX - Temuco',
+    'Planta Osorno':               'X - Puerto Montt',
+    'Oficina Ventas Valdivia':     'XIV - Valdivia',
+};
+function nombreRegion(centro) { return CENTRO_REGION[centro] || centro; }
+
 let CENTRO = CENTROS[0];
 let BASE = {};
 let ORDEN_CATS = [];
@@ -729,7 +748,7 @@ function aplicarEstado(estado) {
     ORDEN_CATS = Object.keys(BASE);
     customItems = {};
     nextCustomId = 1;
-    document.getElementById('fCentro').textContent = CENTRO;
+    document.getElementById('fCentro').textContent = nombreRegion(CENTRO);
     filtrarContratistasPorCentro();
     construirTablas();
 
@@ -805,7 +824,7 @@ async function exportarExcel() {
     sheet.mergeCells('A1:I1');
     sheet.getRow(1).height = 28;
     const banner = sheet.getCell('A1');
-    banner.value = 'COTIZACIÓN LIBRE · ' + CENTRO.toUpperCase();
+    banner.value = 'COTIZACIÓN LIBRE · ' + nombreRegion(CENTRO).toUpperCase();
     banner.font = { name: 'Arial', bold: true, size: 14, color: { argb: C.white } };
     banner.fill = fillSolid(C.blue);
     banner.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -816,7 +835,7 @@ async function exportarExcel() {
         ['CLIENTE', document.getElementById('fCliente').value || '-'],
         ['RUT / ID', document.getElementById('fRut').value || '-'],
         ['DIRECCIÓN', document.getElementById('fDireccion').value || '-'],
-        ['CENTRO', CENTRO],
+        ['CENTRO', nombreRegion(CENTRO)],
         ['FECHA', document.getElementById('fFecha').value || '-'],
         ['VIGENCIA', (document.getElementById('fVigenciaDias').value || '-') + ' días'],
         ['VÁLIDA HASTA', document.getElementById('fVigenciaHasta').value || '-'],
@@ -1197,7 +1216,7 @@ function confirmarCentroInicial() {
     CENTRO = sel.value;
     BASE = BASE_BY_CENTRO[CENTRO] || {};
     ORDEN_CATS = Object.keys(BASE);
-    document.getElementById('fCentro').textContent = CENTRO;
+    document.getElementById('fCentro').textContent = nombreRegion(CENTRO);
     filtrarContratistasPorCentro();
     construirTablas();
     recalcTotalGeneral();
@@ -1234,7 +1253,7 @@ function confirmarCentroInicial() {
             sel.innerHTML = '<option value="">Sin centros disponibles</option>';
             return;
         }
-        sel.innerHTML = disponibles.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        sel.innerHTML = disponibles.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(nombreRegion(c))}</option>`).join('');
         sel.disabled = false;
         btn.disabled = false;
         btn.style.opacity = '';
