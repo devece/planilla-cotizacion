@@ -120,6 +120,14 @@
                 <input id="fDireccion" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Dirección">
             </div>
             <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Teléfono cliente</label>
+                <input id="fClienteTelefono" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Teléfono del cliente">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Correo cliente</label>
+                <input id="fClienteCorreo" type="email" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Correo del cliente">
+            </div>
+            <div>
                 <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Centro</label>
                 <div id="fCentro" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border); background: var(--aba-silver); color: var(--aba-blue); font-weight: 600;"></div>
             </div>
@@ -301,7 +309,7 @@ function hayDatosIngresados() {
         || Array.from(document.querySelectorAll('tr.row .inp-cant')).some(inp => parseFloat(inp.value) > 0);
 }
 
-const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion'];
+const CAMPOS_PROYECTO = ['fProyecto', 'fNumeroProyecto', 'fCliente', 'fRut', 'fDireccion', 'fClienteTelefono', 'fClienteCorreo'];
 const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto', 'fCorreo', 'fTelefono'];
 
 function limpiarDatos() {
@@ -697,7 +705,7 @@ function recopilarEstado() {
     return {
         version: 1,
         centro: CENTRO,
-        proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fFecha: val('fFecha'), fVigenciaDias: val('fVigenciaDias') },
+        proyecto: { fProyecto: val('fProyecto'), fNumeroProyecto: val('fNumeroProyecto'), fCliente: val('fCliente'), fRut: val('fRut'), fDireccion: val('fDireccion'), fClienteTelefono: val('fClienteTelefono'), fClienteCorreo: val('fClienteCorreo'), fFecha: val('fFecha'), fVigenciaDias: val('fVigenciaDias') },
         contratista: { fNumeroProveedor: val('fNumeroProveedor'), fNombreProveedor: val('fNombreProveedor'), fContacto: val('fContacto'), fCorreo: val('fCorreo'), fTelefono: val('fTelefono') },
         items, libres
     };
@@ -835,6 +843,8 @@ async function exportarExcel() {
         ['CLIENTE', document.getElementById('fCliente').value || '-'],
         ['RUT / ID', document.getElementById('fRut').value || '-'],
         ['DIRECCIÓN', document.getElementById('fDireccion').value || '-'],
+        ['TELÉFONO CLIENTE', document.getElementById('fClienteTelefono').value || '-'],
+        ['CORREO CLIENTE', document.getElementById('fClienteCorreo').value || '-'],
         ['CENTRO', nombreRegion(CENTRO)],
         ['FECHA', document.getElementById('fFecha').value || '-'],
         ['VIGENCIA', (document.getElementById('fVigenciaDias').value || '-') + ' días'],
@@ -1157,6 +1167,7 @@ async function cargarBaseDatos() {
     const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
     const porCentro = {};
+    const codigosVistosPorCentro = {};
     workbook.SheetNames.forEach(nombreHoja => {
         if (CATS_EXCLUIDAS.includes(nombreHoja)) return;
         const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
@@ -1167,6 +1178,11 @@ async function cargarBaseDatos() {
             const unidad = String(fila['unidad_medida'] ?? '').trim();
             const precio = Number(fila['precio']) || 0;
             if (!centro || !codigo || !descripcion || precio <= 0) return;
+
+            // Un mismo código no puede repetirse dentro de un centro (evita ítems duplicados).
+            if (!codigosVistosPorCentro[centro]) codigosVistosPorCentro[centro] = new Set();
+            if (codigosVistosPorCentro[centro].has(codigo)) return;
+            codigosVistosPorCentro[centro].add(codigo);
 
             const diam = String(fila['diametro'] ?? '').trim() || null;
 
