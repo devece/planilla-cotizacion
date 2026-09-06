@@ -1095,18 +1095,37 @@ const CENTRO_JEFE_PROYECTOS = {
 let CONTRATISTAS_TODOS = [];
 let CONTRATISTAS = [];
 
+// Verifica que una hoja tenga las columnas mínimas esperadas antes de usarla. Sin esto, un
+// renombre de columna en el Excel hace que todas sus filas se descarten en silencio (por no
+// encontrar el valor) en vez de avisar con un error accionable. gruposRequeridos es una lista
+// de grupos de nombres alternativos válidos para una misma columna (ej. ['código','codigo']).
+function requerirColumnas(filas, gruposRequeridos, archivo, hoja) {
+    if (filas.length === 0) return;
+    const columnas = Object.keys(filas[0]);
+    const faltantes = gruposRequeridos.filter(grupo => !grupo.some(nombre => columnas.includes(nombre)));
+    if (faltantes.length > 0) {
+        throw new Error(
+            `${archivo} (hoja "${hoja}"): faltan columnas esperadas [${faltantes.map(g => g.join(' o ')).join(', ')}]. ` +
+            `Columnas encontradas: ${columnas.join(', ')}.`
+        );
+    }
+}
+
 // Descarga y parsea contratistas.xlsx (mismo directorio del sitio) con todos los contratistas,
 // sin filtrar por Jefe de Proyectos todavía (el centro, del que depende el jefe, se elige recién
 // en el modal inicial). Ver filtrarContratistasPorCentro().
 async function cargarContratistas() {
+    if (typeof XLSX === 'undefined') throw new Error('la librería XLSX (lectura de Excel) no cargó; revisá la conexión a internet y recargá la página');
     const res = await fetch('contratistas.xlsx');
     if (!res.ok) throw new Error(`contratistas.xlsx no encontrada (HTTP ${res.status})`);
     const buffer = await res.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+    if (workbook.SheetNames.length === 0) throw new Error('contratistas.xlsx no tiene hojas (archivo vacío o corrupto)');
 
     const lista = [];
     workbook.SheetNames.forEach(nombreHoja => {
         const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
+        requerirColumnas(filas, [['Código Proveedor'], ['Razón Social']], 'contratistas.xlsx', nombreHoja);
         filas.forEach(fila => {
             const codigo = String(fila['Código Proveedor'] ?? '').trim();
             const razonSocial = String(fila['Razón Social'] ?? '').trim();
@@ -1168,16 +1187,19 @@ const CATS_EXCLUIDAS = ['EQUIPO COMPRA DIRECTA', 'SERVICIO COMPRA DIRECTA'];
 // Descarga y parsea base_datos.xlsx (mismo directorio del sitio) armando BASE_BY_CENTRO:
 // { centro: { categoria: [{c,d,u,p}, ...] } }, respetando el orden de hojas del Excel.
 async function cargarBaseDatos() {
+    if (typeof XLSX === 'undefined') throw new Error('la librería XLSX (lectura de Excel) no cargó; revisá la conexión a internet y recargá la página');
     const res = await fetch('base_datos.xlsx');
     if (!res.ok) throw new Error(`base_datos.xlsx no encontrada (HTTP ${res.status})`);
     const buffer = await res.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+    if (workbook.SheetNames.length === 0) throw new Error('base_datos.xlsx no tiene hojas (archivo vacío o corrupto)');
 
     const porCentro = {};
     const codigosVistosPorCentro = {};
     workbook.SheetNames.forEach(nombreHoja => {
         if (CATS_EXCLUIDAS.includes(nombreHoja)) return;
         const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
+        requerirColumnas(filas, [['centro'], ['código', 'codigo'], ['descripción', 'descripcion'], ['precio']], 'base_datos.xlsx', nombreHoja);
         filas.forEach(fila => {
             const centro = String(fila['centro'] || '').trim();
             const codigo = String(fila['código'] ?? fila['codigo'] ?? '').trim();
@@ -1207,14 +1229,17 @@ async function cargarBaseDatos() {
 // "PRECIO POR METRO [CLP/Mt.]". impovar.xlsx no trae columna centro: el material es el mismo
 // para todos los centros.
 async function cargarImpovar() {
+    if (typeof XLSX === 'undefined') throw new Error('la librería XLSX (lectura de Excel) no cargó; revisá la conexión a internet y recargá la página');
     const res = await fetch('impovar.xlsx');
     if (!res.ok) throw new Error(`impovar.xlsx no encontrada (HTTP ${res.status})`);
     const buffer = await res.arrayBuffer();
     const workbook = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+    if (workbook.SheetNames.length === 0) throw new Error('impovar.xlsx no tiene hojas (archivo vacío o corrupto)');
 
     const porCat = { 'CAÑERIAS AP': [], 'CAÑERIAS MP': [], 'CAÑERIAS BP': [] };
     workbook.SheetNames.forEach(nombreHoja => {
         const filas = XLSX.utils.sheet_to_json(workbook.Sheets[nombreHoja]);
+        requerirColumnas(filas, [['CODIGO'], ['DESCRIPCIÓN'], ['PRECIO POR METRO [CLP/Mt.]'], ['CATEGORIA']], 'impovar.xlsx', nombreHoja);
         filas.forEach(fila => {
             const codigo = String(fila['CODIGO'] ?? '').trim();
             const desc = String(fila['DESCRIPCIÓN'] ?? '').trim();
