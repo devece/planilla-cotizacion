@@ -19,11 +19,24 @@
         --aba-silver: #F8F8F8;
         --aba-border: #E5E7EB;
     }
-    body { font-family: Arial, Helvetica, sans-serif; background: var(--aba-silver); }
+    /* Ubuntu Sans si el sistema ya la tiene instalada (no se agrega una fuente web nueva: eso
+       sumaría una dependencia externa); si no, cae al mismo Arial/Helvetica de siempre. */
+    body { font-family: 'Ubuntu Sans', Arial, Helvetica, sans-serif; background: var(--aba-silver); }
     .btn-primary { background: var(--aba-orange); color: #fff; font-weight: 600; padding: 10px 18px; border-radius: 8px; transition: background .15s; }
     .btn-primary:hover { background: var(--aba-orange-dark); }
+    .btn-primary:active { background: #C43F00; }
     .btn-secondary { background: var(--aba-blue); color: #fff; font-weight: 600; padding: 10px 18px; border-radius: 8px; transition: background .15s; }
     .btn-secondary:hover { background: var(--aba-blue-dark); }
+    .btn-secondary:active { background: #000B4D; }
+    /* Foco visible de marca en los campos de texto/fecha/correo/select "planos" del formulario
+       (Datos del proyecto/contratista): antes dependían solo del anillo de foco por defecto del
+       navegador, que varía de estilo entre Chrome/Firefox/Edge y no sigue la paleta corporativa. */
+    input[type="text"]:focus-visible, input[type="date"]:focus-visible,
+    input[type="email"]:focus-visible, select:focus-visible {
+        outline: 2px solid var(--aba-orange);
+        outline-offset: 1px;
+        border-color: var(--aba-orange);
+    }
     .cat-header { background: var(--aba-blue); color: #fff; cursor: pointer; }
     .cat-header:hover { background: var(--aba-blue-dark); }
     table.items { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -31,7 +44,7 @@
     table.items td { padding: 5px 8px; border-bottom: 1px solid var(--aba-border); }
     table.items tbody tr:hover td { background: var(--aba-orange-light); }
     table.items tbody tr.has-qty td { background: #FFFBEB; }
-    .input-num { width: 90px; border: 1px solid var(--aba-border); border-radius: 6px; padding: 4px 6px; text-align: right; }
+    .input-num { width: 90px; border: 1px solid var(--aba-border); border-radius: 6px; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums; }
     .input-num:focus { outline: 2px solid var(--aba-orange); border-color: var(--aba-orange); }
     .input-invalid { border-color: #DC2626 !important; background: #FEF2F2 !important; }
     .input-invalid:focus { outline: 2px solid #DC2626; border-color: #DC2626; }
@@ -57,6 +70,7 @@
     .moi-row td { background: var(--aba-orange-light); font-weight: 700; color: var(--aba-orange-dark); }
     .cat-fixed-badge { font-size: 10px; background: var(--aba-blue-light); color: var(--aba-blue); padding: 2px 6px; border-radius: 4px; font-weight: 600; }
     .summary-card { border-radius: 12px; padding: 14px; text-align: center; }
+    #sumRenova, #sumMOI, #sumContratista, #formulaCheck { font-variant-numeric: tabular-nums; }
     /* Formato contabilidad: $ pegado a la izquierda, cifra pegada a la derecha */
     .money-fmt { display: flex; justify-content: space-between; gap: 4px; font-variant-numeric: tabular-nums; }
     .money-fmt .signo { color: var(--aba-gray); }
