@@ -139,6 +139,13 @@
     <div id="avisosDatosLista" class="rounded-lg border p-3 text-sm" style="background:#FEF3C7; border-color:#FDE68A; color:#78350F;"></div>
 </div>
 
+<div id="avisoCotizacionIncompleta" class="max-w-7xl mx-auto px-4 pt-3" style="display:none;">
+    <div class="rounded-lg border p-3 text-sm flex items-start justify-between gap-3" style="background:#FEF3C7; border-color:#FDE68A; color:#78350F;">
+        <div id="avisoCotizacionIncompletaTexto" style="flex:1;"></div>
+        <button onclick="cerrarAvisoCotizacionIncompleta()" style="background:none; border:none; cursor:pointer; font-weight:700; color:#78350F; font-size:14px; line-height:1;" title="Cerrar aviso">✕</button>
+    </div>
+</div>
+
 <div class="max-w-7xl mx-auto px-4 py-5">
 
     <!-- Datos del proyecto -->
@@ -370,6 +377,7 @@ function limpiarDatos() {
     nextCustomId = 1;
     construirTablas();
     recalcTotalGeneral();
+    cerrarAvisoCotizacionIncompleta();
 }
 
 // Calcula "Válida hasta" = Fecha + días de vigencia elegidos, y lo muestra en formato es-CL.
@@ -879,6 +887,37 @@ function mostrarAvisoDatos(mensaje) {
     cont.style.display = '';
 }
 
+// Aviso persistente de que la cotización cargada desde un JSON quedó incompleta (el catálogo
+// cambió desde que se guardó). Queda visible hasta que el usuario lo cierra a mano o hasta que
+// arranca/limpia una cotización nueva (ver limpiarDatos y confirmarCentroInicial).
+function mostrarAvisoCotizacionIncompleta(mensaje) {
+    const cont = document.getElementById('avisoCotizacionIncompleta');
+    const texto = document.getElementById('avisoCotizacionIncompletaTexto');
+    if (!cont || !texto) return;
+    texto.textContent = mensaje;
+    cont.style.display = '';
+}
+function cerrarAvisoCotizacionIncompleta() {
+    const cont = document.getElementById('avisoCotizacionIncompleta');
+    if (cont) cont.style.display = 'none';
+}
+
+// Esquema mínimo esperado de un archivo de cotización .json antes de tocar cualquier estado:
+// si esto falla, aplicarEstado() ni se llama, así que la cotización actual queda intacta.
+function validarEsquemaEstado(estado) {
+    const errores = [];
+    if (!estado || typeof estado !== 'object' || Array.isArray(estado)) {
+        errores.push('El archivo no contiene un objeto JSON válido.');
+        return errores;
+    }
+    if (!estado.centro || typeof estado.centro !== 'string') errores.push('Falta el campo "centro" (texto).');
+    if (estado.items !== undefined && !Array.isArray(estado.items)) errores.push('El campo "items" debería ser una lista.');
+    if (estado.libres !== undefined && !Array.isArray(estado.libres)) errores.push('El campo "libres" debería ser una lista.');
+    if (estado.proyecto !== undefined && (typeof estado.proyecto !== 'object' || Array.isArray(estado.proyecto))) errores.push('El campo "proyecto" no es válido.');
+    if (estado.contratista !== undefined && (typeof estado.contratista !== 'object' || Array.isArray(estado.contratista))) errores.push('El campo "contratista" no es válido.');
+    return errores;
+}
+
 function filtrar(q) {
     q = (q || '').toLowerCase().trim();
     document.querySelectorAll('.cat-search-input').forEach(inp => inp.value = '');
@@ -954,11 +993,20 @@ function cargarCotizacionArchivo(input) {
     }
     const reader = new FileReader();
     reader.onload = (e) => {
+        let estado;
         try {
-            aplicarEstado(JSON.parse(e.target.result));
+            estado = JSON.parse(e.target.result);
         } catch (err) {
             alert('No se pudo leer el archivo (¿es una cotización .json válida?): ' + err.message);
+            return;
         }
+        const erroresEsquema = validarEsquemaEstado(estado);
+        if (erroresEsquema.length > 0) {
+            // Esquema inválido: no se toca el estado actual de la cotización.
+            alert('El archivo no tiene el formato esperado de una cotización y no se cargó:\n- ' + erroresEsquema.join('\n- '));
+            return;
+        }
+        aplicarEstado(estado);
     };
     reader.readAsText(file);
     input.value = '';
@@ -973,6 +1021,7 @@ function aplicarEstado(estado) {
         alert('El archivo no corresponde a un centro válido o la base de datos actual no lo incluye.');
         return;
     }
+    cerrarAvisoCotizacionIncompleta();
     CENTRO = centroKey;
     BASE = BASE_BY_CENTRO[CENTRO];
     ORDEN_CATS = Object.keys(BASE);
@@ -986,13 +1035,17 @@ function aplicarEstado(estado) {
     Object.entries(estado.contratista || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el) el.value = v || ''; });
     actualizarVigencia();
 
+    // Ítems/categorías que ya no existen en el catálogo actual: se cargan parcialmente (opción B
+    // aprobada) y se informa cada omisión, en vez de descartarla en silencio o de "resucitarla"
+    // como si fuera un ítem libre con datos que ya no corresponden al catálogo vigente.
+    const omitidos = [];
     (estado.items || []).forEach(({ cat, codigo, cant, precio }) => {
         const catIdx = ORDEN_CATS.indexOf(cat);
-        if (catIdx === -1) return;
+        if (catIdx === -1) { omitidos.push(`Ítem código "${codigo ?? '?'}" — la categoría "${cat}" ya no existe en el catálogo actual`); return; }
         const itIdx = (BASE[cat] || []).findIndex(it => it.c === codigo);
-        if (itIdx === -1) return;
+        if (itIdx === -1) { omitidos.push(`Ítem código "${codigo ?? '?'}" de "${cat}" ya no existe en el catálogo actual`); return; }
         const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
-        if (!row) return;
+        if (!row) { omitidos.push(`Ítem código "${codigo ?? '?'}" de "${cat}" no se pudo ubicar en pantalla`); return; }
         row.querySelector('.inp-cant').value = cant || '';
         if (precio) row.querySelector('.inp-precio').value = precio;
         recalcFila(catIdx, itIdx);
@@ -1000,9 +1053,17 @@ function aplicarEstado(estado) {
 
     (estado.libres || []).forEach(({ cat, d, u, cant, precio }) => {
         const catIdx = ORDEN_CATS.indexOf(cat);
-        if (catIdx === -1) return;
+        if (catIdx === -1) { omitidos.push(`Ítem libre "${d ?? '?'}" — la categoría "${cat}" ya no existe en el catálogo actual`); return; }
         const addRow = document.querySelector(`tr.add-row[data-cat="${catIdx}"]`);
-        if (!addRow) return;
+        if (!addRow) { omitidos.push(`Ítem libre "${d ?? '?'}" — la categoría "${cat}" es de catálogo a precio fijo y no admite ítems libres`); return; }
+        // Se valida acá (y no dejando que agregarItemLibre() lo rechace) para que un dato
+        // inválido en el archivo se reporte como omitido en vez de interrumpir la carga con un alert.
+        const cantNum = parseFloat(cant) || 0;
+        const rPrecio = validarPrecio(precio);
+        if (!d || cantNum <= 0 || !rPrecio.valid) {
+            omitidos.push(`Ítem libre "${d ?? '?'}" de "${cat}" tiene datos incompletos o inválidos y no se pudo cargar`);
+            return;
+        }
         addRow.querySelector('.inp-libre-desc').value = d;
         addRow.querySelector('.inp-libre-unidad').value = u;
         addRow.querySelector('.inp-libre-cant').value = cant;
@@ -1013,6 +1074,13 @@ function aplicarEstado(estado) {
     recalcTotalGeneral();
     const modal = document.getElementById('modalCentro');
     if (modal) modal.remove();
+
+    if (omitidos.length > 0) {
+        console.warn('Cotización cargada de forma incompleta — ítems omitidos:', omitidos);
+        mostrarAvisoCotizacionIncompleta(
+            `Esta cotización se cargó de forma incompleta: el catálogo cambió desde que se guardó y ${omitidos.length} ítem(s) no se pudieron aplicar. Revisalos manualmente: ${omitidos.join(' · ')}`
+        );
+    }
 }
 
 // ============================================================
@@ -1575,6 +1643,7 @@ function confirmarCentroInicial() {
     construirTablas();
     recalcTotalGeneral();
     document.getElementById('modalCentro').remove();
+    cerrarAvisoCotizacionIncompleta();
 }
 
 (async function iniciar() {
