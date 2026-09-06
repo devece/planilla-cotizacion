@@ -57,6 +57,10 @@
     table.items tbody tr.has-qty td { background: #FFFBEB; }
     .input-num { width: 90px; border: 1px solid var(--aba-border); border-radius: 6px; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums; }
     .input-num:focus { outline: 2px solid var(--aba-orange); border-color: var(--aba-orange); }
+    /* El header queda "sticky" arriba (~80px con logo+padding+borde): sin esto, un salto de foco
+       o scrollIntoView (nativo del navegador, o el de "Revisar pendientes"/enlaces del modal de
+       exportación) puede dejar el campo tapado justo debajo del header. */
+    input, select, textarea { scroll-margin-top: 90px; }
     .input-invalid { border-color: #DC2626 !important; background: #FEF2F2 !important; }
     .input-invalid:focus { outline: 2px solid #DC2626; border-color: #DC2626; }
     .input-num[disabled] { background: var(--aba-silver); color: var(--aba-gray); }
@@ -175,7 +179,7 @@
                 <div class="text-xs" style="color: var(--aba-gray);">Ingresá tus valores por ítem. La app calcula la diferencia contra el precio Renova y la agrega como MOI por categoría.</div>
             </div>
         </div>
-        <div class="flex gap-2 items-center">
+        <div class="flex flex-wrap gap-2 items-center">
             <a href="manual.html" target="_blank" rel="noopener" class="text-sm font-semibold" style="color: var(--aba-blue); text-decoration: underline; margin-right: 4px;">📖 Manual de Uso</a>
             <input type="file" id="inputCargarCotizacion" accept="application/json" style="display:none" onchange="cargarCotizacionArchivo(this)">
             <button id="btnCargarCotizacion" onclick="document.getElementById('inputCargarCotizacion').click()" class="btn-secondary">📂 Cargar cotización</button>
