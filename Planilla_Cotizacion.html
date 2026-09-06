@@ -847,13 +847,21 @@ function actualizarSubfilaImpovar(catIdx, itIdx, row, it, cant) {
 
 // Subtotal Renova/Contratista/Diferencia de una categoría, calculado desde sus datos
 // (no desde las celdas ya pintadas), para poder usarlo también al calcular otra categoría.
+//
+// Rendimiento (Ronda 3): antes hacía un document.querySelector({data-cat,data-it}) POR ÍTEM del
+// catálogo de la categoría (selector de atributos compuesto, repetido N veces). Se reemplaza por
+// un único querySelectorAll acotado a la categoría, recorrido una vez; el resultado es el mismo
+// grupo de filas, en el mismo orden del documento (que es el mismo orden en que construirTablas()
+// las generó a partir de `items`), así que el cálculo es idéntico — solo cambia cómo se ubican los
+// nodos en el DOM, no qué se hace con ellos.
 function calcularSubtotalCategoria(catIdx) {
     const cat = ORDEN_CATS[catIdx];
     const items = BASE[cat] || [];
     let subRenova = 0, subCtta = 0;
-    items.forEach((it, itIdx) => {
-        const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
-        if (!row) return;
+    const filas = document.querySelectorAll(`tr.row[data-cat="${catIdx}"][data-it]`);
+    filas.forEach(row => {
+        const it = items[row.dataset.it];
+        if (!it) return;
         const rCant = validarCantidad(row.querySelector('.inp-cant').value);
         if (!rCant.valid || rCant.value <= 0) return;
         const cant = rCant.value;
@@ -901,25 +909,43 @@ function recalcCategoria(catIdx) {
     if (moiCell) moiCell.innerHTML = fmtMoneyColor(dif);
 }
 
+// Rendimiento (Ronda 3): antes, cada tecleo disparaba DOS recorridos completos de la cotización
+// con un document.querySelector por ítem cada uno — este (para los totales) y, por separado,
+// contarPendientes() (llamado desde actualizarBannerPendientes) para el banner de pendientes.
+// Ambos leen exactamente la misma información (validez de cantidad/precio de cada fila) en la
+// misma interacción. Ahora este recorrido único hace las dos cosas: calcula los totales Y cuenta
+// los precios/cantidades inválidos (con la misma semántica de contarPendientes — cada campo se
+// cuenta de forma independiente, no se deja de contar un precio inválido solo porque la cantidad
+// de esa misma fila también lo esté), y le pasa el conteo ya calculado a actualizarBannerPendientes
+// para que no tenga que volver a recorrer todo. contarPendientes() en sí NO se tocó ni se eliminó:
+// sigue siendo la fuente de verdad independiente que usa validarAntesDeExportar (una sola vez por
+// clic en "Exportar", no en cada tecleo, así que no necesita esta optimización).
 function recalcTotalGeneral() {
     let totalRenova = 0, totalCtta = 0;
+    let cantidadesInvalidas = 0, preciosInvalidos = 0;
     ORDEN_CATS.forEach((cat, catIdx) => {
         const items = BASE[cat];
-        items.forEach((it, itIdx) => {
-            const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
-            if (!row) return;
+        // Un único querySelectorAll por categoría en vez de un querySelector por ítem: mismas
+        // filas, mismo orden de documento (= mismo orden que `items`), mismo resultado numérico.
+        const filas = document.querySelectorAll(`tr.row[data-cat="${catIdx}"][data-it]`);
+        filas.forEach(row => {
+            const it = items[row.dataset.it];
+            if (!it) return;
             const rCant = validarCantidad(row.querySelector('.inp-cant').value);
-            if (!rCant.valid || rCant.value <= 0) return;
-            const cant = rCant.value;
             const inpPrecio = row.querySelector('.inp-precio');
             const rPrecio = inpPrecio.disabled ? { valid: true, value: it.p } : validarPrecio(inpPrecio.value);
-            if (!rPrecio.valid) return; // precio inválido: no aporta a los totales hasta corregirse
+            if (!rCant.valid) cantidadesInvalidas++;
+            if (!inpPrecio.disabled && !rPrecio.valid) preciosInvalidos++;
+            if (!rCant.valid || rCant.value <= 0 || !rPrecio.valid) return; // no aporta a los totales hasta corregirse
+            const cant = rCant.value;
             totalRenova += cant * it.p;
             totalCtta += cant * rPrecio.value;
             const material = obtenerMaterialImpovar(cat, it, cant);
             if (material) { totalRenova += material.total; totalCtta += material.total; }
         });
         (customItems[catIdx] || []).forEach(item => {
+            if (item.cantidadValida === false) cantidadesInvalidas++;
+            if (item.precioValido === false) preciosInvalidos++;
             if (item.cant > 0 && item.precioValido !== false && item.cantidadValida !== false) {
                 totalCtta += item.cant * item.precio;
             }
@@ -930,7 +956,7 @@ function recalcTotalGeneral() {
     document.getElementById('sumMOI').textContent = fmtMoneyPlain(totalMOI);
     document.getElementById('sumContratista').textContent = fmtMoneyPlain(totalCtta);
     document.getElementById('formulaCheck').textContent = `${fmtMoneyPlain(totalRenova)} + ${fmtMoneyPlain(totalMOI)} = ${fmtMoneyPlain(totalCtta)}`;
-    actualizarBannerPendientes();
+    actualizarBannerPendientes({ precios: preciosInvalidos, cantidades: cantidadesInvalidas, total: preciosInvalidos + cantidadesInvalidas });
 }
 
 // Cuenta cuántos precios contratista (catálogo + libres) están con un valor inválido en la
@@ -939,9 +965,9 @@ function recalcTotalGeneral() {
 function contarPendientes() {
     let precios = 0, cantidades = 0;
     ORDEN_CATS.forEach((cat, catIdx) => {
-        (BASE[cat] || []).forEach((it, itIdx) => {
-            const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
-            if (!row) return;
+        // Un único querySelectorAll por categoría (antes: uno por ítem) — mismo criterio que
+        // calcularSubtotalCategoria()/recalcTotalGeneral(), sin cambiar qué se cuenta.
+        document.querySelectorAll(`tr.row[data-cat="${catIdx}"][data-it]`).forEach(row => {
             if (!validarCantidad(row.querySelector('.inp-cant').value).valid) cantidades++;
             const inpPrecio = row.querySelector('.inp-precio');
             if (inpPrecio.disabled) return;
@@ -957,10 +983,14 @@ function contarPendientes() {
 
 // Refleja en el resumen que hay precios/cantidades pendientes de corregir: el total mostrado no
 // los incluye, así que no debe interpretarse como un total final válido hasta corregirlos.
-function actualizarBannerPendientes() {
+// Acepta un conteo ya calculado (lo pasa recalcTotalGeneral, que de todas formas ya tuvo que leer
+// cada fila para los totales) para no recorrer la cotización una segunda vez solo para contar
+// pendientes. Si se llama sin argumento (compatibilidad con cualquier otro caller), recurre a
+// contarPendientes() como siempre — el resultado es idéntico en ambos casos.
+function actualizarBannerPendientes(pendPrecalculado) {
     const el = document.getElementById('resumenPendientes');
     if (!el) return;
-    const pend = contarPendientes();
+    const pend = pendPrecalculado || contarPendientes();
     if (pend.total === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
     const partes = [];
     if (pend.precios > 0) partes.push(pend.precios === 1 ? '1 precio inválido' : `${pend.precios} precios inválidos`);
@@ -1389,9 +1419,10 @@ function hayItemValidoCotizado() {
 function itemsConPrecioEnCero() {
     const resultado = [];
     ORDEN_CATS.forEach((cat, catIdx) => {
-        (BASE[cat] || []).forEach((it, itIdx) => {
-            const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
-            if (!row) return;
+        const items = BASE[cat] || [];
+        document.querySelectorAll(`tr.row[data-cat="${catIdx}"][data-it]`).forEach(row => {
+            const it = items[row.dataset.it];
+            if (!it) return;
             const inpPrecio = row.querySelector('.inp-precio');
             if (inpPrecio.disabled) return; // catálogo a precio fijo: nunca es $0
             const rCant = validarCantidad(row.querySelector('.inp-cant').value);
