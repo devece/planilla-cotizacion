@@ -81,7 +81,11 @@
        vacía, modal, avisos) y se deja solo lo que corresponde a la cotización en sí (datos de
        proyecto/contratista, resumen y tablas de ítems). */
     @media print {
-        .sticky, #modalCentro, #avisosDatos, #buscador, .cat-search-input,
+        /* Todo lo que es control de UI o aviso transitorio: nunca debe salir impreso, esté o no
+           abierto en pantalla en el momento de imprimir (el !important pisa el display:flex
+           inline que le pone el JS a los modales cuando están abiertos). */
+        .sticky, #modalCentro, #modalValidacionExport, #avisosDatos, #avisoCotizacionIncompleta,
+        #avisoEstado, #buscador, .cat-search-input, .field-error,
         tr.add-row, button, input[type="file"] {
             display: none !important;
         }
@@ -94,6 +98,10 @@
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
+        /* Evita cortar una fila a la mitad entre páginas, y separar el encabezado de una
+           categoría de sus primeras filas cuando el contenido entra en una sola página. */
+        table.items tr { break-inside: avoid; }
+        .cat-header { break-after: avoid; }
         #categorias > div, .bg-white.rounded-lg.border-2 {
             break-inside: avoid;
         }
@@ -1099,12 +1107,42 @@ function restaurarBoton(boton) {
 
 // Aviso persistente de que la cotización cargada desde un JSON quedó incompleta (el catálogo
 // cambió desde que se guardó). Queda visible hasta que el usuario lo cierra a mano o hasta que
-// arranca/limpia una cotización nueva (ver limpiarDatos y confirmarCentroInicial).
-function mostrarAvisoCotizacionIncompleta(mensaje) {
+// arranca/limpia una cotización nueva (ver limpiarDatos y confirmarCentroInicial). El detalle de
+// lo omitido va en un <details> (nativo, accesible por teclado sin JS propio) para no saturar la
+// pantalla con la lista completa apenas se carga.
+function mostrarAvisoCotizacionIncompleta(listaOmitidos) {
     const cont = document.getElementById('avisoCotizacionIncompleta');
     const texto = document.getElementById('avisoCotizacionIncompletaTexto');
     if (!cont || !texto) return;
-    texto.textContent = mensaje;
+    const n = listaOmitidos.length;
+    const resumen = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = 'Cotización cargada de forma incompleta. ';
+    resumen.appendChild(strong);
+    resumen.appendChild(document.createTextNode(
+        `El catálogo cambió desde que se guardó esta cotización: ${n} ${n === 1 ? 'ítem no se pudo aplicar' : 'ítems no se pudieron aplicar'} y deben revisarse manualmente.`
+    ));
+
+    const detalle = document.createElement('details');
+    detalle.style.marginTop = '6px';
+    const resumenDetalle = document.createElement('summary');
+    resumenDetalle.style.cursor = 'pointer';
+    resumenDetalle.style.fontWeight = '600';
+    resumenDetalle.textContent = `Ver detalle de lo omitido (${n})`;
+    detalle.appendChild(resumenDetalle);
+    const lista = document.createElement('ul');
+    lista.style.marginTop = '4px';
+    lista.style.paddingLeft = '20px';
+    listaOmitidos.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        lista.appendChild(li);
+    });
+    detalle.appendChild(lista);
+
+    texto.innerHTML = '';
+    texto.appendChild(resumen);
+    texto.appendChild(detalle);
     cont.style.display = '';
 }
 function cerrarAvisoCotizacionIncompleta() {
@@ -1304,9 +1342,7 @@ function aplicarEstado(estado) {
 
     if (omitidos.length > 0) {
         console.warn('Cotización cargada de forma incompleta — ítems omitidos:', omitidos);
-        mostrarAvisoCotizacionIncompleta(
-            `Esta cotización se cargó de forma incompleta: el catálogo cambió desde que se guardó y ${omitidos.length} ítem(s) no se pudieron aplicar. Revisalos manualmente: ${omitidos.join(' · ')}`
-        );
+        mostrarAvisoCotizacionIncompleta(omitidos);
     } else {
         // Solo cuando NO hubo omisiones: si las hubo, el aviso persistente de arriba ya cuenta
         // la historia completa y un "cargada correctamente" al lado sería contradictorio.
