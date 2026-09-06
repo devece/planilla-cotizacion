@@ -371,6 +371,18 @@ function fmt(n) {
     if (n === 0) return "0";
     return Math.round(n).toLocaleString("es-CL");
 }
+// Cantidad: única fuente de verdad para todas las filas (catálogo y libres). Las cantidades
+// negativas están prohibidas siempre: nunca se convierten a 0 en silencio, se marcan inválidas
+// para que el usuario las corrija a mano. Vacío sigue siendo válido (=0, no es "ítem cotizado").
+function validarCantidad(valorCrudo) {
+    const str = String(valorCrudo ?? '').trim();
+    if (!str) return { valid: true, value: 0, reason: null };
+    const n = Number(str); // Number() es más estricto que parseFloat: "12abc" no pasa como 12
+    if (!Number.isFinite(n)) return { valid: false, value: null, reason: 'Cantidad inválida' };
+    if (n < 0) return { valid: false, value: null, reason: 'No se permiten cantidades negativas' };
+    return { valid: true, value: n, reason: null };
+}
+
 // Interpreta precios en formato chileno CLP. Nunca devuelve un número para un valor que no se
 // pueda interpretar con seguridad (así no se confunde un precio inválido con un $0 real): en su
 // lugar devuelve { valid:false, value:null, reason }, para que quien llama decida qué mostrar.
@@ -556,15 +568,18 @@ function recalcFila(catIdx, itIdx) {
     const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
     if (!row) return;
     const it = BASE[ORDEN_CATS[catIdx]][itIdx];
-    const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
+    const inpCant = row.querySelector('.inp-cant');
     const inpPrecio = row.querySelector('.inp-precio');
+    const rCant = validarCantidad(inpCant.value);
     // Catálogo a precio fijo: el input está deshabilitado y siempre trae el precio Renova, nunca
     // pasa por el parseo de texto libre del usuario.
     const rPrecio = inpPrecio.disabled ? { valid: true, value: it.p, reason: null } : validarPrecio(inpPrecio.value);
+    marcarValidez(inpCant, rCant);
     marcarValidez(inpPrecio, rPrecio);
 
-    if (!rPrecio.valid) {
-        // Precio inválido: la fila no aporta ningún valor inventado a los totales hasta corregirse.
+    if (!rCant.valid || !rPrecio.valid) {
+        // Cantidad y/o precio inválidos: la fila no aporta ningún valor inventado a los totales
+        // hasta corregirse (nunca se trata una cantidad negativa como si fuera 0).
         row.querySelector('.cell-totrenova').innerHTML = fmtPendiente();
         row.querySelector('.cell-totctta').innerHTML = fmtPendiente();
         row.querySelector('.cell-dif').innerHTML = fmtPendiente();
@@ -575,6 +590,7 @@ function recalcFila(catIdx, itIdx) {
         return;
     }
 
+    const cant = rCant.value;
     const precioCtta = rPrecio.value;
     const totRenova = cant * it.p;
     const totCtta = cant * precioCtta;
@@ -628,8 +644,9 @@ function calcularSubtotalCategoria(catIdx) {
     items.forEach((it, itIdx) => {
         const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
         if (!row) return;
-        const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
-        if (cant <= 0) return;
+        const rCant = validarCantidad(row.querySelector('.inp-cant').value);
+        if (!rCant.valid || rCant.value <= 0) return;
+        const cant = rCant.value;
         const inpPrecio = row.querySelector('.inp-precio');
         const rPrecio = inpPrecio.disabled ? { valid: true, value: it.p } : validarPrecio(inpPrecio.value);
         if (!rPrecio.valid) return; // precio inválido: no aporta a los totales hasta corregirse
@@ -639,7 +656,7 @@ function calcularSubtotalCategoria(catIdx) {
         if (material) { subRenova += material.total; subCtta += material.total; }
     });
     (customItems[catIdx] || []).forEach(item => {
-        if (item.cant > 0 && item.precioValido !== false) subCtta += item.cant * item.precio;
+        if (item.cant > 0 && item.precioValido !== false && item.cantidadValida !== false) subCtta += item.cant * item.precio;
     });
     return { subRenova, subCtta, dif: subCtta - subRenova };
 }
@@ -681,8 +698,9 @@ function recalcTotalGeneral() {
         items.forEach((it, itIdx) => {
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
             if (!row) return;
-            const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
-            if (cant <= 0) return;
+            const rCant = validarCantidad(row.querySelector('.inp-cant').value);
+            if (!rCant.valid || rCant.value <= 0) return;
+            const cant = rCant.value;
             const inpPrecio = row.querySelector('.inp-precio');
             const rPrecio = inpPrecio.disabled ? { valid: true, value: it.p } : validarPrecio(inpPrecio.value);
             if (!rPrecio.valid) return; // precio inválido: no aporta a los totales hasta corregirse
@@ -692,7 +710,7 @@ function recalcTotalGeneral() {
             if (material) { totalRenova += material.total; totalCtta += material.total; }
         });
         (customItems[catIdx] || []).forEach(item => {
-            if (item.cant > 0 && item.precioValido !== false) {
+            if (item.cant > 0 && item.precioValido !== false && item.cantidadValida !== false) {
                 totalCtta += item.cant * item.precio;
             }
         });
@@ -709,20 +727,22 @@ function recalcTotalGeneral() {
 // cotización actual. Única fuente de verdad usada tanto por el aviso del resumen como por la
 // validación previa a exportar (ver validarAntesDeExportar).
 function contarPendientes() {
-    let precios = 0;
+    let precios = 0, cantidades = 0;
     ORDEN_CATS.forEach((cat, catIdx) => {
         (BASE[cat] || []).forEach((it, itIdx) => {
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
             if (!row) return;
+            if (!validarCantidad(row.querySelector('.inp-cant').value).valid) cantidades++;
             const inpPrecio = row.querySelector('.inp-precio');
             if (inpPrecio.disabled) return;
             if (!validarPrecio(inpPrecio.value).valid) precios++;
         });
     });
-    document.querySelectorAll('tr.row-libre .inp-precio').forEach(inp => {
-        if (!validarPrecio(inp.value).valid) precios++;
+    document.querySelectorAll('tr.row-libre').forEach(tr => {
+        if (!validarCantidad(tr.querySelector('.inp-cant').value).valid) cantidades++;
+        if (!validarPrecio(tr.querySelector('.inp-precio').value).valid) precios++;
     });
-    return { precios, cantidades: 0, total: precios };
+    return { precios, cantidades, total: precios + cantidades };
 }
 
 // Refleja en el resumen que hay precios/cantidades pendientes de corregir: el total mostrado no
@@ -792,14 +812,18 @@ function recalcFilaLibre(catIdx, id) {
     const tr = document.querySelector(`tr.row-libre[data-cat="${catIdx}"][data-custom-id="${id}"]`);
     const item = (customItems[catIdx] || []).find(i => i.id === id);
     if (!tr || !item) return;
-    const cant = parseFloat(tr.querySelector('.inp-cant').value) || 0;
+    const inpCant = tr.querySelector('.inp-cant');
     const inpPrecio = tr.querySelector('.inp-precio');
+    const rCant = validarCantidad(inpCant.value);
     const rPrecio = validarPrecio(inpPrecio.value);
+    marcarValidez(inpCant, rCant);
     marcarValidez(inpPrecio, rPrecio);
-    item.cant = cant;
+    item.cantidadValida = rCant.valid;
+    item.cant = rCant.valid ? rCant.value : 0;
     item.precioValido = rPrecio.valid;
     item.precio = rPrecio.valid ? rPrecio.value : 0;
-    if (!rPrecio.valid) {
+    const cant = item.cant;
+    if (!rCant.valid || !rPrecio.valid) {
         tr.querySelector('.cell-totctta').innerHTML = fmtPendiente();
         tr.querySelector('.cell-dif').innerHTML = fmtPendiente();
     } else {
@@ -1081,9 +1105,10 @@ async function exportarExcel() {
         const cantidades = items.map((it, itIdx) => {
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
             if (!row) return 0;
-            return parseFloat(row.querySelector('.inp-cant').value) || 0;
+            const rCant = validarCantidad(row.querySelector('.inp-cant').value);
+            return rCant.valid ? rCant.value : 0; // no debería ocurrir: exportar está bloqueado si hay cantidades inválidas
         });
-        const librosCat = (customItems[catIdx] || []).filter(item => item.cant > 0 && item.precioValido !== false);
+        const librosCat = (customItems[catIdx] || []).filter(item => item.cant > 0 && item.precioValido !== false && item.cantidadValida !== false);
         let huboItems = cantidades.some(c => c > 0) || librosCat.length > 0;
         if (catIdx === catIdxObrasCiviles && catIdxNormalizaciones !== -1 && difPropiaPorCategoria[catIdxNormalizaciones] !== 0) {
             huboItems = true; // Obras Civiles debe imprimirse igual si sólo Normalizaciones generó diferencia
