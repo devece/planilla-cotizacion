@@ -17,14 +17,25 @@
         --aba-blue-light: #EBEEF9;
         --aba-gray: #54585A;
         --aba-silver: #F8F8F8;
-        --aba-border: #E5E7EB;
+        /* Ronda 3 — auditoría de contraste: #E5E7EB medía 1.24:1 contra blanco (WCAG 1.4.11 pide
+           3:1 para bordes de componentes). Se oscurece lo mínimo necesario para llegar a 3:1; se
+           usa en todos lados vía esta única variable, así que el cambio es consistente en toda
+           la app en vez de un ajuste puntual en algunos inputs sí y otros no. */
+        --aba-border: #868FA2;
+        /* Fondo de botones sólidos con texto blanco: el naranja de marca (#FE5100) da 3.29:1 con
+           texto blanco (falla el 4.5:1 de WCAG para texto normal). Esta variante más oscura del
+           MISMO matiz da 4.59:1. --aba-orange/--aba-orange-dark NO se tocan: siguen siendo el
+           naranja de marca para acentos, badges, texto y foco, donde ya cumplían. */
+        --aba-orange-btn: #D63F00;
+        --aba-orange-btn-hover: #C43F00;
+        --aba-orange-btn-active: #B83700;
     }
     /* Ubuntu Sans si el sistema ya la tiene instalada (no se agrega una fuente web nueva: eso
        sumaría una dependencia externa); si no, cae al mismo Arial/Helvetica de siempre. */
     body { font-family: 'Ubuntu Sans', Arial, Helvetica, sans-serif; background: var(--aba-silver); }
-    .btn-primary { background: var(--aba-orange); color: #fff; font-weight: 600; padding: 10px 18px; border-radius: 8px; transition: background .15s; }
-    .btn-primary:hover { background: var(--aba-orange-dark); }
-    .btn-primary:active { background: #C43F00; }
+    .btn-primary { background: var(--aba-orange-btn); color: #fff; font-weight: 600; padding: 10px 18px; border-radius: 8px; transition: background .15s; }
+    .btn-primary:hover { background: var(--aba-orange-btn-hover); }
+    .btn-primary:active { background: var(--aba-orange-btn-active); }
     .btn-secondary { background: var(--aba-blue); color: #fff; font-weight: 600; padding: 10px 18px; border-radius: 8px; transition: background .15s; }
     .btn-secondary:hover { background: var(--aba-blue-dark); }
     .btn-secondary:active { background: #000B4D; }
@@ -1516,8 +1527,16 @@ let _handlerTecladoModalExport = null;
 // tabindex="-1") para que el usuario primero entienda qué pasó, no a un botón; los mensajes que
 // corresponden a un campo puntual se ofrecen como enlace ("Bloque B" de la ronda de accesibilidad).
 function abrirModalValidacionExport(bloqueantes, advertencias) {
-    _elementoActivoAntesDeModalExport = document.activeElement;
     const modal = document.getElementById('modalValidacionExport');
+    const yaEstabaAbierto = modal.style.display === 'flex';
+    // Si por algún motivo se llama de nuevo mientras ya está abierto, no se vuelve a capturar
+    // document.activeElement (en ese momento sería el título del propio modal, no el disparador
+    // real) ni se agrega un segundo listener de teclado — eso dejaría uno huérfano al cerrar
+    // (solo se puede quitar la ÚLTIMA referencia guardada) y respondiendo Escape/Tab dos veces.
+    if (!yaEstabaAbierto) {
+        _elementoActivoAntesDeModalExport = document.activeElement;
+        if (_handlerTecladoModalExport) document.removeEventListener('keydown', _handlerTecladoModalExport);
+    }
 
     const renderLista = (mensajes) => mensajes.map(m => {
         const targetId = idCampoPorMensaje(m);
@@ -1533,11 +1552,12 @@ function abrirModalValidacionExport(bloqueantes, advertencias) {
     document.getElementById('btnExportarDeTodasFormas').style.display = bloqueantes.length ? 'none' : '';
 
     modal.style.display = 'flex';
-    const titulo = document.getElementById('modalValidacionExportTitulo');
-    if (titulo) titulo.focus();
-
-    _handlerTecladoModalExport = (e) => manejarTeclaEnModal(e, modal, () => cerrarModalValidacionExport());
-    document.addEventListener('keydown', _handlerTecladoModalExport);
+    if (!yaEstabaAbierto) {
+        const titulo = document.getElementById('modalValidacionExportTitulo');
+        if (titulo) titulo.focus();
+        _handlerTecladoModalExport = (e) => manejarTeclaEnModal(e, modal, () => cerrarModalValidacionExport());
+        document.addEventListener('keydown', _handlerTecladoModalExport);
+    }
 }
 
 // Botón/enlace de un error puntual dentro del modal: cierra el modal y lleva foco + scroll al
