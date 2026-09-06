@@ -96,6 +96,24 @@
     </div>
 </div>
 
+<div id="modalValidacionExport" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,.5); display:none;">
+    <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4" style="border: 1px solid var(--aba-border); max-height: 85vh; overflow-y: auto;">
+        <div class="text-sm font-bold uppercase mb-3" style="color: var(--aba-blue);">📋 Revisión antes de exportar</div>
+        <div id="validacionBloqueantes" style="display:none;">
+            <div class="text-xs font-bold uppercase mb-1" style="color:#B91C1C;">No se puede exportar mientras falte:</div>
+            <ul id="listaBloqueantes" class="text-sm mb-4" style="color:#B91C1C; padding-left:20px; list-style:disc;"></ul>
+        </div>
+        <div id="validacionAdvertencias" style="display:none;">
+            <div class="text-xs font-bold uppercase mb-1" style="color:#92400E;">Advertencias (podés exportar igual):</div>
+            <ul id="listaAdvertencias" class="text-sm mb-4" style="color:#92400E; padding-left:20px; list-style:disc;"></ul>
+        </div>
+        <div class="flex justify-end gap-2 mt-2">
+            <button onclick="cerrarModalValidacionExport()" class="btn-secondary">Volver a corregir</button>
+            <button id="btnExportarDeTodasFormas" onclick="confirmarExportarConAdvertencias()" class="btn-primary">Exportar de todas formas</button>
+        </div>
+    </div>
+</div>
+
 <div class="sticky top-0 z-30 bg-white border-b shadow-sm" style="border-color: var(--aba-border);">
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
@@ -1000,24 +1018,109 @@ function aplicarEstado(estado) {
 // ============================================================
 // EXPORTAR A EXCEL (mismo formato/lógica de MOI que la app Nota de Venta)
 // ============================================================
+// Hay al menos un ítem VÁLIDO (cantidad y precio, cuando aplica, sin errores) con cantidad > 0.
+// A diferencia de hayDatosIngresados() (que solo mira si hay algo escrito, usada para los avisos
+// de "¿reemplazar los datos actuales?"), esta es la que decide si hay algo cotizable de verdad.
+function hayItemValidoCotizado() {
+    const filaValidaEnCatalogo = Array.from(document.querySelectorAll('tr.row')).some(row => {
+        const rCant = validarCantidad(row.querySelector('.inp-cant').value);
+        if (!rCant.valid || rCant.value <= 0) return false;
+        const inpPrecio = row.querySelector('.inp-precio');
+        if (inpPrecio.disabled) return true; // catálogo a precio fijo: precio siempre válido
+        return validarPrecio(inpPrecio.value).valid;
+    });
+    if (filaValidaEnCatalogo) return true;
+    return Object.values(customItems).some(arr => (arr || []).some(item =>
+        item.cant > 0 && item.precioValido !== false && item.cantidadValida !== false
+    ));
+}
+
+// Ítems cotizados (cantidad válida > 0) con precio contratista exactamente $0: advertencia, no
+// bloqueante (un precio en $0 puede ser legítimo, pero es lo bastante inusual como para avisar).
+function itemsConPrecioEnCero() {
+    const resultado = [];
+    ORDEN_CATS.forEach((cat, catIdx) => {
+        (BASE[cat] || []).forEach((it, itIdx) => {
+            const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+            if (!row) return;
+            const inpPrecio = row.querySelector('.inp-precio');
+            if (inpPrecio.disabled) return; // catálogo a precio fijo: nunca es $0
+            const rCant = validarCantidad(row.querySelector('.inp-cant').value);
+            const rPrecio = validarPrecio(inpPrecio.value);
+            if (rCant.valid && rCant.value > 0 && rPrecio.valid && rPrecio.value === 0) resultado.push(it.d);
+        });
+    });
+    document.querySelectorAll('tr.row-libre').forEach(tr => {
+        const rCant = validarCantidad(tr.querySelector('.inp-cant').value);
+        const rPrecio = validarPrecio(tr.querySelector('.inp-precio').value);
+        if (rCant.valid && rCant.value > 0 && rPrecio.valid && rPrecio.value === 0) {
+            resultado.push(tr.querySelector('td:nth-child(2)').textContent.trim());
+        }
+    });
+    return resultado;
+}
+
 function validarAntesDeExportar() {
-    const faltantes = [];
-    if (!val('fProyecto')) faltantes.push('Proyecto');
-    if (!val('fCliente')) faltantes.push('Cliente');
-    if (!val('fNombreProveedor')) faltantes.push('Nombre Proveedor');
-    if (!hayDatosIngresados()) faltantes.push('al menos un ítem cotizado (cantidad > 0)');
-    return faltantes;
+    const bloqueantes = [];
+    const advertencias = [];
+
+    if (!val('fProyecto')) bloqueantes.push('Proyecto');
+    if (!val('fCliente')) bloqueantes.push('Cliente');
+    if (!val('fNombreProveedor')) bloqueantes.push('Nombre Proveedor');
+    if (!val('fFecha')) bloqueantes.push('Fecha');
+    if (!hayItemValidoCotizado()) bloqueantes.push('Al menos un ítem válido con cantidad mayor a 0');
+
+    const pend = contarPendientes();
+    if (pend.precios > 0) {
+        bloqueantes.push(pend.precios === 1 ? '1 precio contratista inválido — corregilo antes de exportar' : `${pend.precios} precios contratista inválidos — corregilos antes de exportar`);
+    }
+    if (pend.cantidades > 0) {
+        bloqueantes.push(pend.cantidades === 1 ? '1 cantidad inválida o negativa — corregila antes de exportar' : `${pend.cantidades} cantidades inválidas o negativas — corregilas antes de exportar`);
+    }
+
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (val('fClienteCorreo') && !emailRe.test(val('fClienteCorreo'))) advertencias.push('El correo del cliente no parece válido');
+    if (val('fCorreo') && !emailRe.test(val('fCorreo'))) advertencias.push('El correo de contacto/proveedor no parece válido');
+    if (!val('fRut')) advertencias.push('RUT / ID del cliente vacío');
+    if (!val('fDireccion')) advertencias.push('Dirección del proyecto vacía');
+    itemsConPrecioEnCero().forEach(desc => advertencias.push(`Ítem con cantidad cotizada pero precio contratista en $0: "${desc}"`));
+
+    return { bloqueantes, advertencias };
+}
+
+// Abre el panel de revisión con lo bloqueante (si hay) y las advertencias. El botón "Exportar de
+// todas formas" solo se muestra cuando no hay bloqueantes.
+function abrirModalValidacionExport(bloqueantes, advertencias) {
+    const modal = document.getElementById('modalValidacionExport');
+    document.getElementById('listaBloqueantes').innerHTML = bloqueantes.map(b => `<li>${escapeHtml(b)}</li>`).join('');
+    document.getElementById('listaAdvertencias').innerHTML = advertencias.map(a => `<li>${escapeHtml(a)}</li>`).join('');
+    document.getElementById('validacionBloqueantes').style.display = bloqueantes.length ? '' : 'none';
+    document.getElementById('validacionAdvertencias').style.display = advertencias.length ? '' : 'none';
+    document.getElementById('btnExportarDeTodasFormas').style.display = bloqueantes.length ? 'none' : '';
+    modal.style.display = 'flex';
+}
+
+function cerrarModalValidacionExport() {
+    document.getElementById('modalValidacionExport').style.display = 'none';
+}
+
+async function confirmarExportarConAdvertencias() {
+    cerrarModalValidacionExport();
+    await generarYDescargarExcel();
 }
 
 async function exportarExcel() {
     if (typeof ExcelJS === 'undefined') { alert('Librería ExcelJS no cargada'); return; }
 
-    const faltantes = validarAntesDeExportar();
-    if (faltantes.length > 0) {
-        alert('Antes de exportar completá:\n- ' + faltantes.join('\n- '));
+    const { bloqueantes, advertencias } = validarAntesDeExportar();
+    if (bloqueantes.length > 0 || advertencias.length > 0) {
+        abrirModalValidacionExport(bloqueantes, advertencias);
         return;
     }
+    await generarYDescargarExcel();
+}
 
+async function generarYDescargarExcel() {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('COTIZACION');
 
