@@ -93,6 +93,10 @@
     </div>
 </div>
 
+<div id="avisosDatos" class="max-w-7xl mx-auto px-4 pt-3" style="display:none;">
+    <div id="avisosDatosLista" class="rounded-lg border p-3 text-sm" style="background:#FEF3C7; border-color:#FDE68A; color:#78350F;"></div>
+</div>
+
 <div class="max-w-7xl mx-auto px-4 py-5">
 
     <!-- Datos del proyecto -->
@@ -660,6 +664,19 @@ function quitarItemLibre(catIdx, id) {
 
 function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Aviso visible y no bloqueante para cuando una fuente de datos secundaria (contratistas.xlsx,
+// impovar.xlsx) falla al cargar: la app sigue funcionando, pero el usuario debe enterarse de qué
+// funcionalidad quedó parcial en vez de descubrirlo por prueba y error.
+function mostrarAvisoDatos(mensaje) {
+    const cont = document.getElementById('avisosDatos');
+    const lista = document.getElementById('avisosDatosLista');
+    if (!cont || !lista) return;
+    const linea = document.createElement('div');
+    linea.textContent = '⚠️ ' + mensaje;
+    lista.appendChild(linea);
+    cont.style.display = '';
 }
 
 function filtrar(q) {
@@ -1281,6 +1298,7 @@ function confirmarCentroInicial() {
         CONTRATISTAS_TODOS = await cargarContratistas();
     } catch (e) {
         console.warn('No se pudo cargar contratistas.xlsx:', e.message);
+        mostrarAvisoDatos(`No se pudo cargar contratistas.xlsx (${e.message}). El autocompletado de datos del proveedor no va a estar disponible: completá el contratista a mano.`);
     }
 
     // El material Impovar también es "nice to have": si falla su carga, las cañerías se pueden
@@ -1289,6 +1307,7 @@ function confirmarCentroInicial() {
         IMPOVAR_BY_CAT = await cargarImpovar();
     } catch (e) {
         console.warn('No se pudo cargar impovar.xlsx (no se agregará material de cañerías automáticamente):', e.message);
+        mostrarAvisoDatos(`No se pudo cargar impovar.xlsx (${e.message}). No se va a agregar automáticamente el material de cañería a los ítems de instalación; agregalo como ítem libre si corresponde.`);
     }
 
     const sel = document.getElementById('selCentroInicial');
