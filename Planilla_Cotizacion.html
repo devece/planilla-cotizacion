@@ -36,6 +36,23 @@
     .input-invalid { border-color: #DC2626 !important; background: #FEF2F2 !important; }
     .input-invalid:focus { outline: 2px solid #DC2626; border-color: #DC2626; }
     .input-num[disabled] { background: var(--aba-silver); color: var(--aba-gray); }
+    /* Mensaje de error visible junto al campo (no solo tooltip/borde): asociado por aria-describedby. */
+    .field-error { color: #B91C1C; font-size: 10px; line-height: 1.25; margin-top: 2px; text-align: right; font-weight: 600; }
+    .field-error::before { content: "⚠ "; }
+    .field-error-block { text-align: left; }
+    /* Foco visible consistente para elementos interactivos que no son <button>/<a> nativos
+       (encabezados de categoría con role="button") y refuerzo sobre botones/inputs. */
+    .cat-header:focus-visible, .btn-primary:focus-visible, .btn-secondary:focus-visible,
+    .btn-quitar:focus-visible, .btn-agregar-libre:focus-visible, .modal-error-link:focus-visible,
+    .btn-icon:focus-visible {
+        outline: 2px solid var(--aba-orange);
+        outline-offset: 2px;
+    }
+    .btn-primary:disabled, .btn-secondary:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-primary[aria-busy="true"], .btn-secondary[aria-busy="true"] { cursor: progress; }
+    .modal-error-link { background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+    .modal-error-link:hover { color: #7C2D12; }
+    .btn-icon { background: none; border: none; cursor: pointer; }
     .subtotal-row td { background: var(--aba-blue-light); font-weight: 700; color: var(--aba-blue); border-top: 2px solid var(--aba-blue); }
     .moi-row td { background: var(--aba-orange-light); font-weight: 700; color: var(--aba-orange-dark); }
     .cat-fixed-badge { font-size: 10px; background: var(--aba-blue-light); color: var(--aba-blue); padding: 2px 6px; border-radius: 4px; font-weight: 600; }
@@ -85,9 +102,9 @@
 </head>
 <body>
 
-<div id="modalCentro" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,.5);">
+<div id="modalCentro" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,.5);" role="dialog" aria-modal="true" aria-labelledby="modalCentroTitulo">
     <div class="bg-white rounded-lg p-6 w-full max-w-sm mx-4" style="border: 1px solid var(--aba-border);">
-        <div class="text-sm font-bold uppercase mb-1" style="color: var(--aba-blue);">📁 Selecciona el centro</div>
+        <div id="modalCentroTitulo" class="text-sm font-bold uppercase mb-1" style="color: var(--aba-blue);">📁 Selecciona el centro</div>
         <div id="modalCentroTexto" class="text-xs mb-4" style="color: var(--aba-gray);">Elegí el centro con el que vas a cotizar antes de comenzar.</div>
         <select id="selCentroInicial" class="w-full border rounded-lg px-3 py-2 mb-4" style="border-color: var(--aba-border);" disabled>
             <option value="">⏳ Cargando…</option>
@@ -96,9 +113,11 @@
     </div>
 </div>
 
-<div id="modalValidacionExport" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,.5); display:none;">
-    <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4" style="border: 1px solid var(--aba-border); max-height: 85vh; overflow-y: auto;">
-        <div class="text-sm font-bold uppercase mb-3" style="color: var(--aba-blue);">📋 Revisión antes de exportar</div>
+<div id="modalValidacionExport" class="fixed inset-0 z-50 flex items-center justify-center" style="background: rgba(0,0,0,.5); display:none;" role="dialog" aria-modal="true" aria-labelledby="modalValidacionExportTitulo" aria-describedby="modalValidacionExportDesc">
+    <div class="bg-white rounded-lg p-6 w-full max-w-lg mx-4" style="border: 1px solid var(--aba-border); max-height: 85vh; overflow-y: auto; position:relative;">
+        <button type="button" class="btn-icon" onclick="cerrarModalValidacionExport()" aria-label="Cerrar revisión de exportación" style="position:absolute; top:10px; right:10px; font-size:16px; color:var(--aba-gray); line-height:1;">✕</button>
+        <div id="modalValidacionExportTitulo" tabindex="-1" class="text-sm font-bold uppercase mb-2 pr-6" style="color: var(--aba-blue);">📋 Revisión antes de exportar</div>
+        <div id="modalValidacionExportDesc" class="text-xs mb-3" style="color: var(--aba-gray);">Revisá lo siguiente antes de generar el archivo Excel.</div>
         <div id="validacionBloqueantes" style="display:none;">
             <div class="text-xs font-bold uppercase mb-1" style="color:#B91C1C;">No se puede exportar mientras falte:</div>
             <ul id="listaBloqueantes" class="text-sm mb-4" style="color:#B91C1C; padding-left:20px; list-style:disc;"></ul>
@@ -108,8 +127,8 @@
             <ul id="listaAdvertencias" class="text-sm mb-4" style="color:#92400E; padding-left:20px; list-style:disc;"></ul>
         </div>
         <div class="flex justify-end gap-2 mt-2">
-            <button onclick="cerrarModalValidacionExport()" class="btn-secondary">Volver a corregir</button>
-            <button id="btnExportarDeTodasFormas" onclick="confirmarExportarConAdvertencias()" class="btn-primary">Exportar de todas formas</button>
+            <button type="button" onclick="cerrarModalValidacionExport()" class="btn-secondary">Volver a corregir</button>
+            <button type="button" id="btnExportarDeTodasFormas" onclick="confirmarExportarConAdvertencias()" class="btn-primary">Exportar de todas formas</button>
         </div>
     </div>
 </div>
@@ -126,10 +145,10 @@
         <div class="flex gap-2 items-center">
             <a href="manual.html" target="_blank" rel="noopener" class="text-sm font-semibold" style="color: var(--aba-blue); text-decoration: underline; margin-right: 4px;">📖 Manual de Uso</a>
             <input type="file" id="inputCargarCotizacion" accept="application/json" style="display:none" onchange="cargarCotizacionArchivo(this)">
-            <button onclick="document.getElementById('inputCargarCotizacion').click()" class="btn-secondary">📂 Cargar cotización</button>
-            <button onclick="guardarCotizacion()" class="btn-secondary">💾 Guardar cotización</button>
+            <button id="btnCargarCotizacion" onclick="document.getElementById('inputCargarCotizacion').click()" class="btn-secondary">📂 Cargar cotización</button>
+            <button id="btnGuardarCotizacion" onclick="guardarCotizacion(this)" class="btn-secondary">💾 Guardar cotización</button>
             <button onclick="limpiarDatos()" class="btn-secondary">🧹 Limpiar datos</button>
-            <button onclick="exportarExcel()" class="btn-primary">📊 Exportar a Excel</button>
+            <button id="btnExportarExcel" onclick="exportarExcel(this)" class="btn-primary">📊 Exportar a Excel</button>
             <button onclick="window.print()" class="btn-secondary">🖨️ Imprimir</button>
         </div>
     </div>
@@ -153,31 +172,33 @@
         <div class="text-xs font-bold uppercase mb-3" style="color: var(--aba-blue);">📁 Datos del proyecto</div>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Proyecto</label>
-                <input id="fProyecto" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del proyecto">
+                <label class="block text-xs font-semibold uppercase mb-1" for="fProyecto" style="color: var(--aba-gray);">Proyecto</label>
+                <input id="fProyecto" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del proyecto" oninput="limpiarErrorCampoRequerido(this)">
+                <div id="errfProyecto" class="field-error field-error-block" hidden></div>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Número Proyecto</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fNumeroProyecto" style="color: var(--aba-gray);">Número Proyecto</label>
                 <input id="fNumeroProyecto" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proyecto">
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Cliente</label>
-                <input id="fCliente" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del cliente">
+                <label class="block text-xs font-semibold uppercase mb-1" for="fCliente" style="color: var(--aba-gray);">Cliente</label>
+                <input id="fCliente" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del cliente" oninput="limpiarErrorCampoRequerido(this)">
+                <div id="errfCliente" class="field-error field-error-block" hidden></div>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">RUT / ID</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fRut" style="color: var(--aba-gray);">RUT / ID</label>
                 <input id="fRut" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);">
             </div>
             <div class="md:col-span-2">
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Dirección del proyecto</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fDireccion" style="color: var(--aba-gray);">Dirección del proyecto</label>
                 <input id="fDireccion" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Dirección">
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Teléfono cliente</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fClienteTelefono" style="color: var(--aba-gray);">Teléfono cliente</label>
                 <input id="fClienteTelefono" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Teléfono del cliente">
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Correo cliente</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fClienteCorreo" style="color: var(--aba-gray);">Correo cliente</label>
                 <input id="fClienteCorreo" type="email" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Correo del cliente">
             </div>
             <div>
@@ -185,11 +206,12 @@
                 <div id="fCentro" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border); background: var(--aba-silver); color: var(--aba-blue); font-weight: 600;"></div>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Fecha</label>
-                <input id="fFecha" type="date" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" onchange="actualizarVigencia()">
+                <label class="block text-xs font-semibold uppercase mb-1" for="fFecha" style="color: var(--aba-gray);">Fecha</label>
+                <input id="fFecha" type="date" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" onchange="actualizarVigencia(); limpiarErrorCampoRequerido(this)">
+                <div id="errfFecha" class="field-error field-error-block" hidden></div>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Vigencia de la cotización</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fVigenciaDias" style="color: var(--aba-gray);">Vigencia de la cotización</label>
                 <select id="fVigenciaDias" onchange="actualizarVigencia()" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);">
                     <option value="15">15 días</option>
                     <option value="30" selected>30 días</option>
@@ -197,7 +219,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Válida hasta</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fVigenciaHasta" style="color: var(--aba-gray);">Válida hasta</label>
                 <input id="fVigenciaHasta" type="text" readonly class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border); background: var(--aba-silver); color: var(--aba-gray);">
             </div>
         </div>
@@ -208,25 +230,26 @@
         <div class="text-xs font-bold uppercase mb-3" style="color: var(--aba-orange-dark);">🛠️ Datos del contratista</div>
         <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Número Proveedor</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fNumeroProveedor" style="color: var(--aba-gray);">Número Proveedor</label>
                 <input id="fNumeroProveedor" type="text" list="dlContratistas" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="N° de proveedor" oninput="autocompletarContratista(this.value)">
                 <datalist id="dlContratistas"></datalist>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Nombre Proveedor</label>
-                <input id="fNombreProveedor" type="text" list="dlContratistasNombres" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Razón social contratista" oninput="autocompletarContratista(this.value)">
+                <label class="block text-xs font-semibold uppercase mb-1" for="fNombreProveedor" style="color: var(--aba-gray);">Nombre Proveedor</label>
+                <input id="fNombreProveedor" type="text" list="dlContratistasNombres" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Razón social contratista" oninput="autocompletarContratista(this.value); limpiarErrorCampoRequerido(this)">
+                <div id="errfNombreProveedor" class="field-error field-error-block" hidden></div>
                 <datalist id="dlContratistasNombres"></datalist>
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Contacto</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fContacto" style="color: var(--aba-gray);">Contacto</label>
                 <input id="fContacto" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Nombre del contacto">
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Correo</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fCorreo" style="color: var(--aba-gray);">Correo</label>
                 <input id="fCorreo" type="email" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Correo de contacto">
             </div>
             <div>
-                <label class="block text-xs font-semibold uppercase mb-1" style="color: var(--aba-gray);">Teléfono</label>
+                <label class="block text-xs font-semibold uppercase mb-1" for="fTelefono" style="color: var(--aba-gray);">Teléfono</label>
                 <input id="fTelefono" type="text" class="w-full border rounded-lg px-3 py-2" style="border-color: var(--aba-border);" placeholder="Teléfono de contacto">
             </div>
         </div>
@@ -259,7 +282,7 @@
                 <div class="font-bold text-sm text-green-700">✅ Base Renova + MOI = Total Contratista</div>
                 <div id="formulaCheck" class="text-xs mt-1 font-mono">$0 + $0 = $0</div>
             </div>
-            <div id="resumenPendientes" class="mt-3 p-3 text-center rounded-lg text-sm font-semibold" style="display:none; background:#FEF2F2; border:1px solid #FCA5A5; color:#B91C1C;"></div>
+            <div id="resumenPendientes" class="mt-3 p-3 text-center rounded-lg text-sm font-semibold" role="status" style="display:none; background:#FEF2F2; border:1px solid #FCA5A5; color:#B91C1C;"></div>
         </div>
     </div>
 
@@ -404,8 +427,8 @@ function validarCantidad(valorCrudo) {
     const str = String(valorCrudo ?? '').trim();
     if (!str) return { valid: true, value: 0, reason: null };
     const n = Number(str); // Number() es más estricto que parseFloat: "12abc" no pasa como 12
-    if (!Number.isFinite(n)) return { valid: false, value: null, reason: 'Cantidad inválida' };
-    if (n < 0) return { valid: false, value: null, reason: 'No se permiten cantidades negativas' };
+    if (!Number.isFinite(n)) return { valid: false, value: null, reason: 'La cantidad debe ser un número igual o mayor que 0.' };
+    if (n < 0) return { valid: false, value: null, reason: 'La cantidad no puede ser negativa. Ingresá un número igual o mayor que 0.' };
     return { valid: true, value: n, reason: null };
 }
 
@@ -425,10 +448,10 @@ function validarPrecio(valorCrudo) {
     if (!sinRuido) return { valid: true, value: 0, reason: null };
 
     if (sinRuido.includes('-')) {
-        return { valid: false, value: null, reason: 'No se permiten precios negativos' };
+        return { valid: false, value: null, reason: 'El precio no puede ser negativo.' };
     }
     if (!/^[\d.,]+$/.test(sinRuido)) {
-        return { valid: false, value: null, reason: 'El precio contiene caracteres no válidos' };
+        return { valid: false, value: null, reason: 'Ingresá un precio válido en formato chileno, por ejemplo: 12.500.' };
     }
 
     const tienePunto = sinRuido.includes('.');
@@ -447,7 +470,7 @@ function validarPrecio(valorCrudo) {
             normalizado = partes.join('.'); // "1234,56" -> decimal
         } else {
             // "1,234" (3 dígitos tras la coma) es ambigua: no se adivina, se marca inválida.
-            return { valid: false, value: null, reason: 'Formato ambiguo: usá punto para miles y coma para decimales (ej: 1.234,56)' };
+            return { valid: false, value: null, reason: 'Formato ambiguo: usá punto para los miles y coma para los decimales, por ejemplo 1.234,56.' };
         }
     } else if (tienePunto) {
         const partes = sinRuido.split('.');
@@ -457,7 +480,7 @@ function validarPrecio(valorCrudo) {
         } else if (partes.length === 2 && partes[1].length <= 2) {
             normalizado = partes.join('.'); // "9.5" -> decimal
         } else {
-            return { valid: false, value: null, reason: 'Formato de precio ambiguo' };
+            return { valid: false, value: null, reason: 'Ingresá un precio válido en formato chileno, por ejemplo: 12.500.' };
         }
     } else {
         normalizado = sinRuido;
@@ -465,23 +488,47 @@ function validarPrecio(valorCrudo) {
 
     const n = parseFloat(normalizado);
     if (!Number.isFinite(n)) {
-        return { valid: false, value: null, reason: 'No se pudo interpretar el precio' };
+        return { valid: false, value: null, reason: 'Ingresá un precio válido en formato chileno, por ejemplo: 12.500.' };
     }
     return { valid: true, value: n, reason: null };
 }
 
 // Marca visualmente (borde rojo + tooltip accesible) un input cuyo valor no se pudo validar.
 // Compartida por precio y cantidad: ambos usan el mismo objeto { valid, value, reason }.
-function marcarValidez(input, resultado) {
+// Marca (o limpia) el estado inválido de un input de cantidad/precio: borde rojo + aria-invalid +
+// un mensaje de error REAL y visible (no solo tooltip), asociado con aria-describedby y con id
+// propio para que el lector de pantalla lo anuncie al enfocar el campo.
+//
+// No "pelea" con el usuario mientras escribe por primera vez: si el campo todavía no mostraba
+// error, una detección de invalidez durante el tipeo (oninput) no se muestra todavía — se muestra
+// recién al perder el foco, al importar un JSON, o al intentar exportar (opciones.forzar=true en
+// esos tres casos). Una vez que el error ya se está mostrando, sí se actualiza en cada tecleo para
+// poder retirarlo apenas se corrige.
+function marcarValidez(input, resultado, opciones) {
     if (!input) return;
+    const forzar = !!(opciones && opciones.forzar);
+    const yaMostrabaError = input.classList.contains('input-invalid');
+    if (!forzar && !yaMostrabaError && !resultado.valid) return;
+
+    const msgEl = input.nextElementSibling && input.nextElementSibling.classList.contains('field-error')
+        ? input.nextElementSibling : null;
+
     if (resultado.valid) {
         input.classList.remove('input-invalid');
         input.removeAttribute('aria-invalid');
         input.title = '';
+        if (msgEl) { msgEl.hidden = true; msgEl.textContent = ''; }
+        input.removeAttribute('aria-describedby');
     } else {
         input.classList.add('input-invalid');
         input.setAttribute('aria-invalid', 'true');
-        input.title = resultado.reason || 'Valor inválido';
+        const mensaje = resultado.reason || 'Valor inválido';
+        input.title = mensaje;
+        if (msgEl) {
+            msgEl.textContent = mensaje;
+            msgEl.hidden = false;
+            input.setAttribute('aria-describedby', msgEl.id);
+        }
     }
 }
 
@@ -491,12 +538,91 @@ function fmtPendiente() {
     return '<span style="color:#DC2626; font-weight:600; font-size:11px;" title="Corregí el precio o la cantidad de esta fila para que se incluya en los totales">⚠️ Pendiente</span>';
 }
 
+// Campos de texto obligatorios (Proyecto, Cliente, Nombre Proveedor, Fecha): no tienen un
+// "formato" que validar mientras se escribe, así que solo se marcan como pendientes al intentar
+// exportar (ver revelarErroresPendientes) y se limpian apenas el usuario escribe algo (ver el
+// oninput/onchange de cada campo en el HTML).
+function marcarCampoRequerido(id, mensaje) {
+    const input = document.getElementById(id);
+    const msg = document.getElementById('err' + id);
+    if (!input) return;
+    input.classList.add('input-invalid');
+    input.setAttribute('aria-invalid', 'true');
+    input.title = mensaje;
+    if (msg) {
+        msg.textContent = mensaje;
+        msg.hidden = false;
+        input.setAttribute('aria-describedby', msg.id);
+    }
+}
+function limpiarErrorCampoRequerido(input) {
+    if (!input) return;
+    input.classList.remove('input-invalid');
+    input.removeAttribute('aria-invalid');
+    input.removeAttribute('aria-describedby');
+    input.title = '';
+    const msg = document.getElementById('err' + input.id);
+    if (msg) { msg.hidden = true; msg.textContent = ''; }
+}
+
+// Busca, en el orden del DOM, el primer input de cantidad o precio (catálogo o libre) que esté
+// actualmente marcado inválido. Requiere que el error ya se haya "revelado" (ver más abajo); se
+// usa tanto para el botón "Revisar pendientes" del resumen como para los enlaces del panel de
+// validación de exportación que apuntan a un campo concreto.
+function primerInputInvalido(tipo) {
+    const selector = tipo === 'precio' ? '.inp-precio' : '.inp-cant';
+    return Array.from(document.querySelectorAll(`tr.row ${selector}`)).find(inp => inp.classList.contains('input-invalid')) || null;
+}
+
+// Fuerza a que se muestren (borde + mensaje) todos los errores de cantidad/precio que ya existan
+// pero que el usuario todavía no vio (por ejemplo, un precio inválido que llegó así al cargar un
+// JSON, sin que el usuario haya pasado el foco por ese campo).
+// Nota de rendimiento: esto SOLO marca (borde/aria/mensaje) — no llama a recalcFila/recalcFilaLibre
+// completos, que además recalculan categoría + total general + banner de pendientes cada vez. Con
+// centros de varios cientos de ítems, hacer eso una vez POR FILA es cuadrático y se nota; el valor
+// de cada celda ya está al día (recalcFila corre en cada tecleo real), acá solo falta mostrarlo.
+function revelarErroresDeItems() {
+    document.querySelectorAll('tr.row[data-cat][data-it]').forEach(row => {
+        const inpCant = row.querySelector('.inp-cant');
+        const inpPrecio = row.querySelector('.inp-precio');
+        marcarValidez(inpCant, validarCantidad(inpCant.value), { forzar: true });
+        if (!inpPrecio.disabled) marcarValidez(inpPrecio, validarPrecio(inpPrecio.value), { forzar: true });
+    });
+    document.querySelectorAll('tr.row-libre[data-cat][data-custom-id]').forEach(tr => {
+        const inpCant = tr.querySelector('.inp-cant');
+        const inpPrecio = tr.querySelector('.inp-precio');
+        marcarValidez(inpCant, validarCantidad(inpCant.value), { forzar: true });
+        marcarValidez(inpPrecio, validarPrecio(inpPrecio.value), { forzar: true });
+    });
+}
+// Igual que arriba, pero también revela los 4 campos obligatorios vacíos. Se usa antes de abrir
+// el panel de revisión de exportación.
+function revelarErroresPendientes() {
+    revelarErroresDeItems();
+    if (!val('fProyecto')) marcarCampoRequerido('fProyecto', 'Completá el nombre del proyecto para continuar.');
+    if (!val('fCliente')) marcarCampoRequerido('fCliente', 'Completá el nombre del cliente para continuar.');
+    if (!val('fNombreProveedor')) marcarCampoRequerido('fNombreProveedor', 'Completá el nombre del proveedor para continuar.');
+    if (!val('fFecha')) marcarCampoRequerido('fFecha', 'Completá la fecha de la cotización para continuar.');
+}
+
+// Botón "Revisar pendientes" del banner de resumen: revela los errores de ítems y lleva el foco
+// al primero, con scroll suave. Si por algún motivo no encuentra ninguno (no debería pasar
+// mientras el banner esté visible), no hace nada — no hay elemento al cual mover el foco.
+function revisarPendientes() {
+    revelarErroresDeItems();
+    const primero = primerInputInvalido('precio') || primerInputInvalido('cantidad');
+    if (primero) {
+        primero.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        primero.focus({ preventScroll: true });
+    }
+}
+
 // Al perder foco, muestra el precio ya interpretado (formato "es-CL") para que el contratista
 // confirme que "9.916" se leyó como $9.916 y no como 9,916. Si el valor es inválido, se deja el
 // texto tal cual lo escribió el usuario (nunca se lo reemplaza silenciosamente por $0).
 function reformatearPrecio(input) {
     const r = validarPrecio(input.value);
-    marcarValidez(input, r);
+    marcarValidez(input, r, { forzar: true }); // se llama al perder foco: acá sí se muestra el error
     if (r.valid) input.value = r.value > 0 ? fmt(r.value) : '';
 }
 function fmtMoneyPlain(n) { return '$' + fmt(n); }
@@ -519,7 +645,7 @@ function construirTablas() {
         if (!items || items.length === 0) return;
         const esFijo = CATS_PRECIO_FIJO.includes(cat);
         html += `<div class="bg-white rounded-lg border mb-4 overflow-hidden" style="border-color: var(--aba-border);">
-            <div class="cat-header px-4 py-2 font-bold text-sm flex items-center justify-between" onclick="toggleCat(${catIdx})">
+            <div id="catHeader${catIdx}" class="cat-header px-4 py-2 font-bold text-sm flex items-center justify-between" role="button" tabindex="0" aria-expanded="true" aria-controls="catBody${catIdx}" onclick="toggleCat(${catIdx})" onkeydown="onKeyToggleCat(event, ${catIdx})">
                 <span>${escapeHtml(cat)} <span class="text-xs font-normal opacity-80">(${items.length} ítems)</span></span>
                 ${esFijo ? '<span class="cat-fixed-badge" style="background:rgba(255,255,255,.2); color:#fff;">CATÁLOGO A PRECIO FIJO RENOVA</span>' : ''}
             </div>
@@ -545,10 +671,16 @@ function construirTablas() {
                 <td class="text-xs" style="color:var(--aba-gray);">${escapeHtml(it.c.replace(/^0+/, '') || '-')}</td>
                 <td>${escapeHtml(it.d)}</td>
                 <td class="text-center">${escapeHtml(it.u)}</td>
-                <td class="text-right"><input type="number" min="0" step="0.5" class="input-num inp-cant" value="" oninput="recalcFila(${catIdx},${itIdx})"></td>
+                <td class="text-right">
+                    <input type="number" min="0" step="0.5" class="input-num inp-cant" id="cant-${catIdx}-${itIdx}" value="" oninput="recalcFila(${catIdx},${itIdx})" onblur="recalcFila(${catIdx},${itIdx},{mostrarErrores:true})">
+                    <div id="errCant-${catIdx}-${itIdx}" class="field-error" hidden></div>
+                </td>
                 <td class="text-right">${fmtMoney(it.p)}</td>
                 <td class="text-right cell-totrenova">${fmtMoney(0)}</td>
-                <td class="text-right"><input type="text" inputmode="decimal" class="input-num inp-precio" value="${esFijo ? it.p : ''}" placeholder="${esFijo ? '' : 'Ingrese valor'}" ${esFijo ? 'disabled' : ''} oninput="recalcFila(${catIdx},${itIdx})" onblur="reformatearPrecio(this)"></td>
+                <td class="text-right">
+                    <input type="text" inputmode="decimal" class="input-num inp-precio" id="precio-${catIdx}-${itIdx}" value="${esFijo ? it.p : ''}" placeholder="${esFijo ? '' : 'Ingrese valor'}" ${esFijo ? 'disabled' : ''} oninput="recalcFila(${catIdx},${itIdx})" onblur="reformatearPrecio(this); recalcFila(${catIdx},${itIdx},{mostrarErrores:true})">
+                    <div id="errPrecio-${catIdx}-${itIdx}" class="field-error" hidden></div>
+                </td>
                 <td class="text-right cell-totctta">${fmtMoney(0)}</td>
                 <td class="text-right cell-dif">${fmtMoneyColor(0)}</td>
                 <td></td>
@@ -587,10 +719,27 @@ function construirTablas() {
 
 function toggleCat(catIdx) {
     const body = document.getElementById('catBody' + catIdx);
-    body.style.display = (body.style.display === 'none') ? '' : 'none';
+    const seVaAOcultar = body.style.display !== 'none';
+    body.style.display = seVaAOcultar ? 'none' : '';
+    const header = document.getElementById('catHeader' + catIdx);
+    if (header) header.setAttribute('aria-expanded', seVaAOcultar ? 'false' : 'true');
 }
 
-function recalcFila(catIdx, itIdx) {
+// El encabezado de categoría es un <div role="button"> (para no alterar su estilo/layout actual
+// convirtiéndolo en <button>), así que necesita su propio manejo de teclado: Enter y Espacio deben
+// activarlo igual que un botón nativo. Espacio además hay que prevenirlo para que no haga scroll.
+function onKeyToggleCat(event, catIdx) {
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+        event.preventDefault();
+        toggleCat(catIdx);
+    }
+}
+
+// opciones.mostrarErrores fuerza que un precio/cantidad recién detectado como inválido se marque
+// de inmediato (borde + mensaje), en vez de esperar a que el usuario pierda el foco del campo.
+// Se usa al perder el foco, al cargar un JSON y al intentar exportar; el oninput de cada tecleo
+// llama a esta función SIN esa opción para no "pelear" con el usuario mientras todavía escribe.
+function recalcFila(catIdx, itIdx, opciones) {
     const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
     if (!row) return;
     const it = BASE[ORDEN_CATS[catIdx]][itIdx];
@@ -600,8 +749,9 @@ function recalcFila(catIdx, itIdx) {
     // Catálogo a precio fijo: el input está deshabilitado y siempre trae el precio Renova, nunca
     // pasa por el parseo de texto libre del usuario.
     const rPrecio = inpPrecio.disabled ? { valid: true, value: it.p, reason: null } : validarPrecio(inpPrecio.value);
-    marcarValidez(inpCant, rCant);
-    marcarValidez(inpPrecio, rPrecio);
+    const forzar = { forzar: !!(opciones && opciones.mostrarErrores) };
+    marcarValidez(inpCant, rCant, forzar);
+    marcarValidez(inpPrecio, rPrecio, forzar);
 
     if (!rCant.valid || !rPrecio.valid) {
         // Cantidad y/o precio inválidos: la fila no aporta ningún valor inventado a los totales
@@ -777,11 +927,13 @@ function actualizarBannerPendientes() {
     const el = document.getElementById('resumenPendientes');
     if (!el) return;
     const pend = contarPendientes();
-    if (pend.total === 0) { el.style.display = 'none'; el.textContent = ''; return; }
+    if (pend.total === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
     const partes = [];
     if (pend.precios > 0) partes.push(pend.precios === 1 ? '1 precio inválido' : `${pend.precios} precios inválidos`);
     if (pend.cantidades > 0) partes.push(pend.cantidades === 1 ? '1 cantidad inválida' : `${pend.cantidades} cantidades inválidas`);
-    el.textContent = `⚠️ Hay ${partes.join(' y ')} por corregir. El total de arriba es parcial (no los incluye) y no se puede exportar hasta corregirlos.`;
+    const campo = pend.total === 1 ? 'campo pendiente' : 'campos pendientes';
+    el.innerHTML = `⚠️ Hay ${pend.total} ${campo} por corregir (${partes.join(' y ')}). El total de arriba es parcial (no los incluye) y no se puede exportar hasta corregirlos.`
+        + ` <button type="button" class="modal-error-link" style="color:#B91C1C;" onclick="revisarPendientes()">Revisar pendientes</button>`;
     el.style.display = '';
 }
 
@@ -822,19 +974,25 @@ function agregarItemLibre(catIdx) {
         <td class="text-xs" style="color:var(--aba-gray);">LIBRE</td>
         <td>${escapeHtml(desc)}<span class="badge-libre">ÍTEM LIBRE</span></td>
         <td class="text-center">${escapeHtml(unidad)}</td>
-        <td class="text-right"><input type="number" min="0" step="0.5" class="input-num inp-cant" value="${cant}" oninput="recalcFilaLibre(${catIdx},${id})"></td>
+        <td class="text-right">
+            <input type="number" min="0" step="0.5" class="input-num inp-cant" id="cantLibre-${catIdx}-${id}" value="${cant}" oninput="recalcFilaLibre(${catIdx},${id})" onblur="recalcFilaLibre(${catIdx},${id},{mostrarErrores:true})">
+            <div id="errCantLibre-${catIdx}-${id}" class="field-error" hidden></div>
+        </td>
         <td class="text-right">${fmtMoney(0)}</td>
         <td class="text-right cell-totrenova">${fmtMoney(0)}</td>
-        <td class="text-right"><input type="text" inputmode="decimal" class="input-num inp-precio" value="${precio || ''}" placeholder="Ingrese valor" oninput="recalcFilaLibre(${catIdx},${id})" onblur="reformatearPrecio(this)"></td>
+        <td class="text-right">
+            <input type="text" inputmode="decimal" class="input-num inp-precio" id="precioLibre-${catIdx}-${id}" value="${precio || ''}" placeholder="Ingrese valor" oninput="recalcFilaLibre(${catIdx},${id})" onblur="reformatearPrecio(this); recalcFilaLibre(${catIdx},${id},{mostrarErrores:true})">
+            <div id="errPrecioLibre-${catIdx}-${id}" class="field-error" hidden></div>
+        </td>
         <td class="text-right cell-totctta">${fmtMoney(0)}</td>
         <td class="text-right cell-dif">${fmtMoneyColor(0)}</td>
-        <td class="text-center"><button class="btn-quitar" onclick="quitarItemLibre(${catIdx},${id})" title="Quitar ítem">✕</button></td>
+        <td class="text-center"><button class="btn-quitar" onclick="quitarItemLibre(${catIdx},${id})" title="Quitar ítem" aria-label="Quitar ítem libre: ${escapeHtml(desc)}">✕</button></td>
     `;
     addRow.parentNode.insertBefore(tr, addRow);
     recalcFilaLibre(catIdx, id);
 }
 
-function recalcFilaLibre(catIdx, id) {
+function recalcFilaLibre(catIdx, id, opciones) {
     const tr = document.querySelector(`tr.row-libre[data-cat="${catIdx}"][data-custom-id="${id}"]`);
     const item = (customItems[catIdx] || []).find(i => i.id === id);
     if (!tr || !item) return;
@@ -842,8 +1000,9 @@ function recalcFilaLibre(catIdx, id) {
     const inpPrecio = tr.querySelector('.inp-precio');
     const rCant = validarCantidad(inpCant.value);
     const rPrecio = validarPrecio(inpPrecio.value);
-    marcarValidez(inpCant, rCant);
-    marcarValidez(inpPrecio, rPrecio);
+    const forzar = { forzar: !!(opciones && opciones.mostrarErrores) };
+    marcarValidez(inpCant, rCant, forzar);
+    marcarValidez(inpPrecio, rPrecio, forzar);
     item.cantidadValida = rCant.valid;
     item.cant = rCant.valid ? rCant.value : 0;
     item.precioValido = rPrecio.valid;
@@ -1048,7 +1207,9 @@ function aplicarEstado(estado) {
         if (!row) { omitidos.push(`Ítem código "${codigo ?? '?'}" de "${cat}" no se pudo ubicar en pantalla`); return; }
         row.querySelector('.inp-cant').value = cant || '';
         if (precio) row.querySelector('.inp-precio').value = precio;
-        recalcFila(catIdx, itIdx);
+        // mostrarErrores:true — esto no es al usuario escribiendo, es un valor que vino de un
+        // archivo; si es inválido tiene que verse marcado de inmediato, no esperar a un blur.
+        recalcFila(catIdx, itIdx, { mostrarErrores: true });
     });
 
     (estado.libres || []).forEach(({ cat, d, u, cant, precio }) => {
@@ -1156,20 +1317,111 @@ function validarAntesDeExportar() {
     return { bloqueantes, advertencias };
 }
 
+// Traduce un mensaje de bloqueante/advertencia (tal como los arma validarAntesDeExportar) al id
+// del campo al que corresponde, para que el panel de validación pueda ofrecer un enlace que lleve
+// directo a corregirlo. Los mensajes agregados de precio/cantidad ("N precios inválidos...")
+// apuntan al primer campo de ese tipo que esté marcado inválido en pantalla. Devuelve null cuando
+// el mensaje no corresponde a un campo puntual (ej: "Al menos un ítem válido...").
+function idCampoPorMensaje(msg) {
+    const directos = {
+        'Proyecto': 'fProyecto',
+        'Cliente': 'fCliente',
+        'Nombre Proveedor': 'fNombreProveedor',
+        'Fecha': 'fFecha',
+        'RUT / ID del cliente vacío': 'fRut',
+        'Dirección del proyecto vacía': 'fDireccion',
+        'El correo del cliente no parece válido': 'fClienteCorreo',
+        'El correo de contacto/proveedor no parece válido': 'fCorreo',
+    };
+    if (directos[msg]) return directos[msg];
+    if (/precio/i.test(msg)) { const inp = primerInputInvalido('precio'); return inp ? inp.id : null; }
+    if (/cantidad/i.test(msg)) { const inp = primerInputInvalido('cantidad'); return inp ? inp.id : null; }
+    return null;
+}
+
+// Trampa de foco genérica para un modal simple (usada por #modalValidacionExport): Tab/Shift+Tab
+// quedan dentro del modal, y Escape lo cierra (nunca "elude" el bloqueo de exportar: Escape hace
+// exactamente lo mismo que "Volver a corregir", jamás dispara la exportación).
+function focuablesEnModal(modalEl) {
+    return Array.from(modalEl.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(el => el.offsetParent !== null);
+}
+function manejarTeclaEnModal(e, modalEl, onEscape) {
+    if (e.key === 'Escape') { e.preventDefault(); onEscape(); return; }
+    if (e.key !== 'Tab') return;
+    const focuables = focuablesEnModal(modalEl);
+    if (focuables.length === 0) return;
+    const primero = focuables[0], ultimo = focuables[focuables.length - 1];
+    if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+}
+
+let _elementoActivoAntesDeModalExport = null;
+let _handlerTecladoModalExport = null;
+
 // Abre el panel de revisión con lo bloqueante (si hay) y las advertencias. El botón "Exportar de
-// todas formas" solo se muestra cuando no hay bloqueantes.
+// todas formas" solo se muestra cuando no hay bloqueantes. El foco va al título del panel (con
+// tabindex="-1") para que el usuario primero entienda qué pasó, no a un botón; los mensajes que
+// corresponden a un campo puntual se ofrecen como enlace ("Bloque B" de la ronda de accesibilidad).
 function abrirModalValidacionExport(bloqueantes, advertencias) {
+    _elementoActivoAntesDeModalExport = document.activeElement;
     const modal = document.getElementById('modalValidacionExport');
-    document.getElementById('listaBloqueantes').innerHTML = bloqueantes.map(b => `<li>${escapeHtml(b)}</li>`).join('');
-    document.getElementById('listaAdvertencias').innerHTML = advertencias.map(a => `<li>${escapeHtml(a)}</li>`).join('');
+
+    const renderLista = (mensajes) => mensajes.map(m => {
+        const targetId = idCampoPorMensaje(m);
+        return targetId
+            ? `<li><button type="button" class="modal-error-link" data-target-id="${escapeHtml(targetId)}" onclick="irACampoDesdeModalExport(this)">${escapeHtml(m)}</button></li>`
+            : `<li>${escapeHtml(m)}</li>`;
+    }).join('');
+
+    document.getElementById('listaBloqueantes').innerHTML = renderLista(bloqueantes);
+    document.getElementById('listaAdvertencias').innerHTML = renderLista(advertencias);
     document.getElementById('validacionBloqueantes').style.display = bloqueantes.length ? '' : 'none';
     document.getElementById('validacionAdvertencias').style.display = advertencias.length ? '' : 'none';
     document.getElementById('btnExportarDeTodasFormas').style.display = bloqueantes.length ? 'none' : '';
+
     modal.style.display = 'flex';
+    const titulo = document.getElementById('modalValidacionExportTitulo');
+    if (titulo) titulo.focus();
+
+    _handlerTecladoModalExport = (e) => manejarTeclaEnModal(e, modal, () => cerrarModalValidacionExport());
+    document.addEventListener('keydown', _handlerTecladoModalExport);
 }
 
-function cerrarModalValidacionExport() {
-    document.getElementById('modalValidacionExport').style.display = 'none';
+// Botón/enlace de un error puntual dentro del modal: cierra el modal y lleva foco + scroll al
+// campo correspondiente.
+function irACampoDesdeModalExport(boton) {
+    cerrarModalValidacionExport({ enfocarId: boton.dataset.targetId });
+}
+
+// Cierra el modal y devuelve el foco a quien lo abrió (o al campo indicado en opciones.enfocarId,
+// si se cerró para ir a corregir un error puntual). Si ese campo ya no existe o no es visible, no
+// mueve el foco a ningún lado en vez de fallar.
+function cerrarModalValidacionExport(opciones) {
+    const modal = document.getElementById('modalValidacionExport');
+    modal.style.display = 'none';
+    if (_handlerTecladoModalExport) {
+        document.removeEventListener('keydown', _handlerTecladoModalExport);
+        _handlerTecladoModalExport = null;
+    }
+
+    const enfocarId = opciones && opciones.enfocarId;
+    if (enfocarId) {
+        const el = document.getElementById(enfocarId);
+        if (el && el.offsetParent !== null) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.focus({ preventScroll: true });
+            _elementoActivoAntesDeModalExport = null;
+            return;
+        }
+        // El campo no existe o no está visible (ej: quedó oculto por un filtro): no se mueve el
+        // foco a ciegas, se cae al comportamiento normal de devolver el foco al disparador.
+    }
+    if (_elementoActivoAntesDeModalExport && document.body.contains(_elementoActivoAntesDeModalExport)) {
+        _elementoActivoAntesDeModalExport.focus();
+    }
+    _elementoActivoAntesDeModalExport = null;
 }
 
 async function confirmarExportarConAdvertencias() {
@@ -1182,6 +1434,7 @@ async function exportarExcel() {
 
     const { bloqueantes, advertencias } = validarAntesDeExportar();
     if (bloqueantes.length > 0 || advertencias.length > 0) {
+        revelarErroresPendientes();
         abrirModalValidacionExport(bloqueantes, advertencias);
         return;
     }
