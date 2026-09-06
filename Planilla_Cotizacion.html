@@ -390,7 +390,7 @@ function construirTablas() {
         const esFijo = CATS_PRECIO_FIJO.includes(cat);
         html += `<div class="bg-white rounded-lg border mb-4 overflow-hidden" style="border-color: var(--aba-border);">
             <div class="cat-header px-4 py-2 font-bold text-sm flex items-center justify-between" onclick="toggleCat(${catIdx})">
-                <span>${cat} <span class="text-xs font-normal opacity-80">(${items.length} ítems)</span></span>
+                <span>${escapeHtml(cat)} <span class="text-xs font-normal opacity-80">(${items.length} ítems)</span></span>
                 ${esFijo ? '<span class="cat-fixed-badge" style="background:rgba(255,255,255,.2); color:#fff;">CATÁLOGO A PRECIO FIJO RENOVA</span>' : ''}
             </div>
             <div id="catBody${catIdx}">
@@ -412,9 +412,9 @@ function construirTablas() {
                     <tbody id="catTbody${catIdx}">`;
         items.forEach((it, itIdx) => {
             html += `<tr class="row" data-cat="${catIdx}" data-it="${itIdx}" data-search="${escapeHtml((it.c + ' ' + it.d).toLowerCase())}">
-                <td class="text-xs" style="color:var(--aba-gray);">${it.c.replace(/^0+/, '') || '-'}</td>
-                <td>${it.d}</td>
-                <td class="text-center">${it.u}</td>
+                <td class="text-xs" style="color:var(--aba-gray);">${escapeHtml(it.c.replace(/^0+/, '') || '-')}</td>
+                <td>${escapeHtml(it.d)}</td>
+                <td class="text-center">${escapeHtml(it.u)}</td>
                 <td class="text-right"><input type="number" min="0" step="0.5" class="input-num inp-cant" value="" oninput="recalcFila(${catIdx},${itIdx})"></td>
                 <td class="text-right">${fmtMoney(it.p)}</td>
                 <td class="text-right cell-totrenova">${fmtMoney(0)}</td>
@@ -440,12 +440,12 @@ function construirTablas() {
         html += `
                     </tbody>
                     <tfoot>
-                        <tr class="subtotal-row"><td colspan="5" class="text-right">SUBTOTAL ${cat}</td><td class="text-right" id="subRenova${catIdx}">${fmtMoney(0)}</td><td></td><td class="text-right" id="subContratista${catIdx}">${fmtMoney(0)}</td><td class="text-right" id="subDif${catIdx}">${fmtMoneyColor(0)}</td><td></td></tr>
+                        <tr class="subtotal-row"><td colspan="5" class="text-right">SUBTOTAL ${escapeHtml(cat)}</td><td class="text-right" id="subRenova${catIdx}">${fmtMoney(0)}</td><td></td><td class="text-right" id="subContratista${catIdx}">${fmtMoney(0)}</td><td class="text-right" id="subDif${catIdx}">${fmtMoneyColor(0)}</td><td></td></tr>
                         ${cat === CAT_NORMALIZACIONES
                             ? `<tr class="moi-row"><td colspan="9" class="text-right" style="font-style:italic;">ℹ️ Normalizaciones no genera MOI propio: su diferencia se traslada como ítem libre a OBRAS CIVILES</td></tr>`
                             : esFijo
                             ? ''
-                            : `<tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${cat})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>`}
+                            : `<tr class="moi-row"><td colspan="7" class="text-right">🛠️ MANO DE OBRA INDUSTRIAL (${escapeHtml(cat)})</td><td class="text-right" id="moi${catIdx}">${fmtMoneyColor(0)}</td><td></td><td></td></tr>`}
                     </tfoot>
                 </table>
                 </div>
@@ -462,6 +462,7 @@ function toggleCat(catIdx) {
 
 function recalcFila(catIdx, itIdx) {
     const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+    if (!row) return;
     const it = BASE[ORDEN_CATS[catIdx]][itIdx];
     const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
     const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
@@ -546,9 +547,12 @@ function recalcMoiObrasCiviles() {
 function recalcCategoria(catIdx) {
     const cat = ORDEN_CATS[catIdx];
     const { subRenova, subCtta, dif } = calcularSubtotalCategoria(catIdx);
-    document.getElementById('subRenova' + catIdx).innerHTML = fmtMoney(subRenova);
-    document.getElementById('subContratista' + catIdx).innerHTML = fmtMoney(subCtta);
-    document.getElementById('subDif' + catIdx).innerHTML = fmtMoneyColor(dif);
+    const elSubRenova = document.getElementById('subRenova' + catIdx);
+    const elSubContratista = document.getElementById('subContratista' + catIdx);
+    const elSubDif = document.getElementById('subDif' + catIdx);
+    if (elSubRenova) elSubRenova.innerHTML = fmtMoney(subRenova);
+    if (elSubContratista) elSubContratista.innerHTML = fmtMoney(subCtta);
+    if (elSubDif) elSubDif.innerHTML = fmtMoneyColor(dif);
 
     if (cat === CAT_NORMALIZACIONES || cat === CAT_OBRAS_CIVILES) {
         recalcMoiObrasCiviles();
@@ -564,6 +568,7 @@ function recalcTotalGeneral() {
         const items = BASE[cat];
         items.forEach((it, itIdx) => {
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+            if (!row) return;
             const cant = parseFloat(row.querySelector('.inp-cant').value) || 0;
             if (cant <= 0) return;
             const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
@@ -900,6 +905,7 @@ async function exportarExcel() {
 
         const cantidades = items.map((it, itIdx) => {
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+            if (!row) return 0;
             return parseFloat(row.querySelector('.inp-cant').value) || 0;
         });
         const librosCat = (customItems[catIdx] || []).filter(item => item.cant > 0);
@@ -922,6 +928,7 @@ async function exportarExcel() {
             const cant = cantidades[itIdx];
             if (cant <= 0) return;
             const row = document.querySelector(`tr.row[data-cat="${catIdx}"][data-it="${itIdx}"]`);
+            if (!row) return;
             const precioCtta = parsePrecio(row.querySelector('.inp-precio').value);
             const totRenova = cant * it.p;
             const totCtta = cant * precioCtta;
