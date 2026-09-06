@@ -161,8 +161,14 @@
 <div id="avisoCotizacionIncompleta" class="max-w-7xl mx-auto px-4 pt-3" style="display:none;">
     <div class="rounded-lg border p-3 text-sm flex items-start justify-between gap-3" style="background:#FEF3C7; border-color:#FDE68A; color:#78350F;">
         <div id="avisoCotizacionIncompletaTexto" style="flex:1;"></div>
-        <button onclick="cerrarAvisoCotizacionIncompleta()" style="background:none; border:none; cursor:pointer; font-weight:700; color:#78350F; font-size:14px; line-height:1;" title="Cerrar aviso">✕</button>
+        <button type="button" class="btn-icon" onclick="cerrarAvisoCotizacionIncompleta()" style="font-weight:700; color:#78350F; font-size:14px; line-height:1;" title="Cerrar aviso" aria-label="Cerrar aviso de cotización incompleta">✕</button>
     </div>
+</div>
+
+<!-- Avisos breves de estado (guardado/cargado/exportado correctamente, errores no bloqueantes de
+     carga de librerías). role="status" = se anuncia sin interrumpir, no compite con role="alert". -->
+<div id="avisoEstado" class="max-w-7xl mx-auto px-4 pt-3" role="status" aria-live="polite" style="display:none;">
+    <div class="rounded-lg border p-3 text-sm" style="background:var(--aba-blue-light); border-color:#C7D2FE; color:var(--aba-blue-dark); font-weight:600;"></div>
 </div>
 
 <div class="max-w-7xl mx-auto px-4 py-5">
@@ -391,8 +397,13 @@ const CAMPOS_CONTRATISTA = ['fNumeroProveedor', 'fNombreProveedor', 'fContacto',
 
 function limpiarDatos() {
     if (!confirm('Esto borra el proyecto, el contratista y todas las cantidades/precios ingresados, manteniendo el centro actual. ¿Continuar?')) return;
-    CAMPOS_PROYECTO.concat(CAMPOS_CONTRATISTA).forEach(id => { document.getElementById(id).value = ''; });
+    CAMPOS_PROYECTO.concat(CAMPOS_CONTRATISTA).forEach(id => {
+        const el = document.getElementById(id);
+        el.value = '';
+        limpiarErrorCampoRequerido(el); // arranca en limpio: sin marcas de error de un intento previo
+    });
     document.getElementById('fFecha').value = new Date().toISOString().split('T')[0];
+    limpiarErrorCampoRequerido(document.getElementById('fFecha'));
     document.getElementById('fVigenciaDias').value = '30';
     actualizarVigencia();
     document.getElementById('buscador').value = '';
@@ -401,6 +412,7 @@ function limpiarDatos() {
     construirTablas();
     recalcTotalGeneral();
     cerrarAvisoCotizacionIncompleta();
+    mostrarAvisoEstado('Datos limpiados. El centro actual se mantuvo.');
 }
 
 // Calcula "Válida hasta" = Fecha + días de vigencia elegidos, y lo muestra en formato es-CL.
@@ -1046,6 +1058,45 @@ function mostrarAvisoDatos(mensaje) {
     cont.style.display = '';
 }
 
+// Aviso breve de estado (guardado/cargado/exportado correctamente, o un error no bloqueante como
+// "no se pudo exportar"): usa role="status" (aria-live="polite" en el HTML), no role="alert", para
+// no interrumpir al usuario por algo que no requiere acción inmediata. Se retira solo después de
+// un rato; no hace falta que el usuario la cierre a mano.
+let _avisoEstadoTimeoutId = null;
+function mostrarAvisoEstado(mensaje, opciones) {
+    const duracionMs = (opciones && opciones.duracionMs) || 4000;
+    const cont = document.getElementById('avisoEstado');
+    if (!cont) return;
+    cont.firstElementChild.textContent = mensaje;
+    cont.style.display = '';
+    if (_avisoEstadoTimeoutId) clearTimeout(_avisoEstadoTimeoutId);
+    _avisoEstadoTimeoutId = setTimeout(() => { cont.style.display = 'none'; }, duracionMs);
+}
+
+// Estados de "ocupado" para botones que disparan una acción que genera un archivo o tarda un
+// instante (guardar, cargar, exportar): deshabilita el botón (evita doble clic/doble descarga),
+// muestra un texto breve ("Guardando…") sin saltos de layout (se fija el ancho actual) y marca
+// aria-busy="true" mientras dura. dataset.ocupado además sirve de guarda explícita contra
+// reentradas (un segundo intento mientras el primero sigue en curso se ignora, ver los call sites).
+function marcarBotonOcupado(boton, textoOcupado) {
+    if (!boton || boton.dataset.ocupado === 'true') return;
+    boton.dataset.ocupado = 'true';
+    boton.dataset.textoOriginal = boton.innerHTML;
+    boton.style.minWidth = boton.getBoundingClientRect().width + 'px';
+    boton.disabled = true;
+    boton.setAttribute('aria-busy', 'true');
+    boton.innerHTML = textoOcupado;
+}
+function restaurarBoton(boton) {
+    if (!boton || boton.dataset.ocupado !== 'true') return;
+    boton.disabled = false;
+    boton.removeAttribute('aria-busy');
+    boton.innerHTML = boton.dataset.textoOriginal || boton.innerHTML;
+    boton.style.minWidth = '';
+    delete boton.dataset.ocupado;
+    delete boton.dataset.textoOriginal;
+}
+
 // Aviso persistente de que la cotización cargada desde un JSON quedó incompleta (el catálogo
 // cambió desde que se guardó). Queda visible hasta que el usuario lo cierra a mano o hasta que
 // arranca/limpia una cotización nueva (ver limpiarDatos y confirmarCentroInicial).
@@ -1131,16 +1182,23 @@ function recopilarEstado() {
     };
 }
 
-function guardarCotizacion() {
-    const estado = recopilarEstado();
-    const blob = new Blob([JSON.stringify(estado, null, 2)], { type: 'application/json' });
-    const proyecto = (val('fProyecto') || 'SIN_PROYECTO').replace(/\s+/g, '_');
-    const centroArchivo = CENTRO.replace(/\s+/g, '_').toUpperCase();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `COTIZACION_${centroArchivo}_${proyecto}.json`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+function guardarCotizacion(boton) {
+    if (boton && boton.dataset.ocupado === 'true') return; // ya en curso: ignora el doble clic
+    marcarBotonOcupado(boton, '💾 Guardando…');
+    try {
+        const estado = recopilarEstado();
+        const blob = new Blob([JSON.stringify(estado, null, 2)], { type: 'application/json' });
+        const proyecto = (val('fProyecto') || 'SIN_PROYECTO').replace(/\s+/g, '_');
+        const centroArchivo = CENTRO.replace(/\s+/g, '_').toUpperCase();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `COTIZACION_${centroArchivo}_${proyecto}.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        mostrarAvisoEstado('Cotización guardada correctamente.');
+    } finally {
+        restaurarBoton(boton);
+    }
 }
 
 function cargarCotizacionArchivo(input) {
@@ -1150,23 +1208,31 @@ function cargarCotizacionArchivo(input) {
         input.value = '';
         return;
     }
+    const boton = document.getElementById('btnCargarCotizacion');
+    if (boton && boton.dataset.ocupado === 'true') return; // ya en curso: ignora el doble clic
+    marcarBotonOcupado(boton, '📂 Cargando…');
     const reader = new FileReader();
     reader.onload = (e) => {
-        let estado;
         try {
-            estado = JSON.parse(e.target.result);
-        } catch (err) {
-            alert('No se pudo leer el archivo (¿es una cotización .json válida?): ' + err.message);
-            return;
+            let estado;
+            try {
+                estado = JSON.parse(e.target.result);
+            } catch (err) {
+                alert('No se pudo leer el archivo (¿es una cotización .json válida?): ' + err.message);
+                return;
+            }
+            const erroresEsquema = validarEsquemaEstado(estado);
+            if (erroresEsquema.length > 0) {
+                // Esquema inválido: no se toca el estado actual de la cotización.
+                alert('El archivo no tiene el formato esperado de una cotización y no se cargó:\n- ' + erroresEsquema.join('\n- '));
+                return;
+            }
+            aplicarEstado(estado);
+        } finally {
+            restaurarBoton(boton);
         }
-        const erroresEsquema = validarEsquemaEstado(estado);
-        if (erroresEsquema.length > 0) {
-            // Esquema inválido: no se toca el estado actual de la cotización.
-            alert('El archivo no tiene el formato esperado de una cotización y no se cargó:\n- ' + erroresEsquema.join('\n- '));
-            return;
-        }
-        aplicarEstado(estado);
     };
+    reader.onerror = () => { restaurarBoton(boton); alert('No se pudo leer el archivo.'); };
     reader.readAsText(file);
     input.value = '';
 }
@@ -1241,6 +1307,10 @@ function aplicarEstado(estado) {
         mostrarAvisoCotizacionIncompleta(
             `Esta cotización se cargó de forma incompleta: el catálogo cambió desde que se guardó y ${omitidos.length} ítem(s) no se pudieron aplicar. Revisalos manualmente: ${omitidos.join(' · ')}`
         );
+    } else {
+        // Solo cuando NO hubo omisiones: si las hubo, el aviso persistente de arriba ya cuenta
+        // la historia completa y un "cargada correctamente" al lado sería contradictorio.
+        mostrarAvisoEstado('Cotización cargada correctamente.');
     }
 }
 
@@ -1424,13 +1494,53 @@ function cerrarModalValidacionExport(opciones) {
     _elementoActivoAntesDeModalExport = null;
 }
 
-async function confirmarExportarConAdvertencias() {
-    cerrarModalValidacionExport();
-    await generarYDescargarExcel();
+// Ejecuta fn() con el botón marcado ocupado (deshabilitado + aria-busy + texto de estado) durante
+// toda la espera. Si el botón ya está ocupado, no hace nada — así una segunda invocación (doble
+// clic, doble evento) mientras la primera sigue en curso queda protegida sin lógica extra en cada
+// call site.
+async function conBotonOcupado(boton, textoOcupado, fn) {
+    if (boton && boton.dataset.ocupado === 'true') return;
+    marcarBotonOcupado(boton, textoOcupado);
+    try {
+        return await fn();
+    } finally {
+        restaurarBoton(boton);
+    }
 }
 
-async function exportarExcel() {
-    if (typeof ExcelJS === 'undefined') { alert('Librería ExcelJS no cargada'); return; }
+// Botón que disparó el intento de exportar en curso: se recuerda para poder mostrarle el estado
+// "Generando Excel…" tanto si se exporta directo como si el usuario confirma desde el modal de
+// advertencias (en ese caso el botón del modal ya se ocultó al cerrarse el modal).
+let _botonExportarActivo = null;
+// Guarda adicional (además de dataset.ocupado del botón) contra doble ejecución: cubre el caso de
+// que confirmarExportarConAdvertencias se dispare dos veces antes de que el modal termine de
+// cerrarse.
+let _exportando = false;
+
+async function ejecutarExportacion() {
+    if (_exportando) return;
+    _exportando = true;
+    try {
+        await conBotonOcupado(_botonExportarActivo, '📊 Generando Excel…', () => generarYDescargarExcel());
+        mostrarAvisoEstado('Archivo Excel generado correctamente.');
+    } catch (e) {
+        mostrarAvisoEstado('No se pudo generar el archivo Excel: ' + (e && e.message ? e.message : 'error desconocido'));
+    } finally {
+        _exportando = false;
+    }
+}
+
+async function confirmarExportarConAdvertencias() {
+    cerrarModalValidacionExport();
+    await ejecutarExportacion();
+}
+
+async function exportarExcel(boton) {
+    _botonExportarActivo = boton || document.getElementById('btnExportarExcel');
+    if (typeof ExcelJS === 'undefined') {
+        mostrarAvisoEstado('No se pudo exportar: la librería ExcelJS no cargó. Recargá la página e intentá de nuevo.');
+        return;
+    }
 
     const { bloqueantes, advertencias } = validarAntesDeExportar();
     if (bloqueantes.length > 0 || advertencias.length > 0) {
@@ -1438,7 +1548,7 @@ async function exportarExcel() {
         abrirModalValidacionExport(bloqueantes, advertencias);
         return;
     }
-    await generarYDescargarExcel();
+    await ejecutarExportacion();
 }
 
 async function generarYDescargarExcel() {
