@@ -57,6 +57,28 @@
     .btn-agregar-libre { background: var(--aba-blue); color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .btn-agregar-libre:hover { background: var(--aba-blue-dark); }
     ::-webkit-scrollbar { height: 10px; width: 10px; }
+
+    /* Impresión: se oculta todo lo que es control de UI (nav, buscadores, fila de ítem libre
+       vacía, modal, avisos) y se deja solo lo que corresponde a la cotización en sí (datos de
+       proyecto/contratista, resumen y tablas de ítems). */
+    @media print {
+        .sticky, #modalCentro, #avisosDatos, #buscador, .cat-search-input,
+        tr.add-row, button, input[type="file"] {
+            display: none !important;
+        }
+        body { background: #fff; }
+        table.items th { position: static; }
+        table.items thead { display: table-header-group; }
+        table.items tfoot { display: table-row-group; }
+        .cat-header, table.items th, .subtotal-row, .moi-row, .summary-card,
+        tr.row-impovar, tr.row-libre, tr.has-qty {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        #categorias > div, .bg-white.rounded-lg.border-2 {
+            break-inside: avoid;
+        }
+    }
 </style>
 </head>
 <body>
