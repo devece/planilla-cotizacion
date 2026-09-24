@@ -892,6 +892,12 @@ async function exportarExcel() {
     const catIdxNormalizaciones = ORDEN_CATS.indexOf(CAT_NORMALIZACIONES);
     const catIdxObrasCiviles = ORDEN_CATS.indexOf(CAT_OBRAS_CIVILES);
 
+    // Fila de subtotal (TOTAL RENOVA/CONTRATISTA/DIFERENCIA) que quedó escrita para cada
+    // categoría, para poder referenciarla luego desde el MOI de Obras Civiles y desde el
+    // TOTAL GENERAL en vez de repetir los valores ya calculados en JS.
+    const subtotalRowByCat = {};
+    const subtotalRows = [];
+
     ORDEN_CATS.forEach((cat, catIdx) => {
         const items = BASE[cat];
         if (!items || items.length === 0) return;
@@ -917,6 +923,7 @@ async function exportarExcel() {
         catCell.fill = fillSolid(C.blueL);
         catCell.alignment = { horizontal: 'left', vertical: 'middle' };
         r++;
+        const inicioItemsRow = r;
 
         items.forEach((it, itIdx) => {
             const cant = cantidades[itIdx];
@@ -933,7 +940,10 @@ async function exportarExcel() {
             fila.forEach((v, i) => {
                 const col = i + 1;
                 const cell = sheet.getCell(r, col);
-                cell.value = v;
+                if (col === 6) cell.value = { formula: `D${r}*E${r}`, result: v };
+                else if (col === 8) cell.value = { formula: `D${r}*G${r}`, result: v };
+                else if (col === 9) cell.value = { formula: `H${r}-F${r}`, result: v };
+                else cell.value = v;
                 cell.border = gridBorder();
                 cell.font = { name: 'Arial', size: 8 };
                 if ([5, 6, 7, 8, 9].includes(col)) { cell.numFmt = MONEY; cell.alignment = { horizontal: 'right', vertical: 'middle' }; }
@@ -952,7 +962,10 @@ async function exportarExcel() {
                 filaMat.forEach((v, i) => {
                     const col = i + 1;
                     const cell = sheet.getCell(r, col);
-                    cell.value = v;
+                    if (col === 6) cell.value = { formula: `D${r}*E${r}`, result: v };
+                    else if (col === 8) cell.value = { formula: `D${r}*G${r}`, result: v };
+                    else if (col === 9) cell.value = { formula: `H${r}-F${r}`, result: v };
+                    else cell.value = v;
                     cell.border = gridBorder();
                     cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: 'FF92400E' } };
                     cell.fill = fillSolid('FFFEF3C7');
@@ -972,7 +985,10 @@ async function exportarExcel() {
             fila.forEach((v, i) => {
                 const col = i + 1;
                 const cell = sheet.getCell(r, col);
-                cell.value = v;
+                if (col === 6) cell.value = { formula: `D${r}*E${r}`, result: v };
+                else if (col === 8) cell.value = { formula: `D${r}*G${r}`, result: v };
+                else if (col === 9) cell.value = { formula: `H${r}-F${r}`, result: v };
+                else cell.value = v;
                 cell.border = gridBorder();
                 cell.font = { name: 'Arial', size: 8, italic: true, color: { argb: C.orange } };
                 cell.fill = fillSolid(C.orangeL);
@@ -984,28 +1000,43 @@ async function exportarExcel() {
         });
 
         const dif = subCtta - subRenova; // = suma de las Diferencias por ítem; el MOI es este mismo valor
+        const finItemsRow = r - 1;
+        const hayFilasDeItems = finItemsRow >= inicioItemsRow;
         sheet.mergeCells(r, 1, r, 4);
         const subLbl = sheet.getCell(r, 1);
         subLbl.value = 'SUBTOTAL ' + cat;
         subLbl.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.blueDark } };
         subLbl.fill = fillSolid(C.blueL);
         subLbl.alignment = { horizontal: 'right', vertical: 'middle' };
+        const filaSubtotal = r;
         [5, 6, 7, 8, 9].forEach(col => {
             const cell = sheet.getCell(r, col);
             cell.fill = fillSolid(C.blueL);
             cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.blueDark } };
             cell.alignment = { horizontal: 'right', vertical: 'middle' };
-            if (col === 6) { cell.value = subRenova; cell.numFmt = MONEY; }
-            else if (col === 8) { cell.value = subCtta; cell.numFmt = MONEY; }
-            else if (col === 9) { cell.value = dif; cell.numFmt = MONEY; }
+            if (col === 6) {
+                cell.value = hayFilasDeItems ? { formula: `SUM(F${inicioItemsRow}:F${finItemsRow})`, result: subRenova } : subRenova;
+                cell.numFmt = MONEY;
+            } else if (col === 8) {
+                cell.value = hayFilasDeItems ? { formula: `SUM(H${inicioItemsRow}:H${finItemsRow})`, result: subCtta } : subCtta;
+                cell.numFmt = MONEY;
+            } else if (col === 9) {
+                cell.value = { formula: `H${filaSubtotal}-F${filaSubtotal}`, result: dif };
+                cell.numFmt = MONEY;
+            }
         });
+        subtotalRowByCat[catIdx] = filaSubtotal;
+        subtotalRows.push(filaSubtotal);
         r++;
 
         // Normalizaciones no lleva MOI propio: no se imprime su fila de MOI, su diferencia ya
         // quedó sumada al MOI de Obras Civiles (ver difParaMoi más abajo).
         let difParaMoi = dif;
+        let formulaMoi = `I${filaSubtotal}`;
         if (catIdx === catIdxObrasCiviles && catIdxNormalizaciones !== -1) {
             difParaMoi = dif + difPropiaPorCategoria[catIdxNormalizaciones];
+            const filaSubtotalNorm = subtotalRowByCat[catIdxNormalizaciones];
+            if (filaSubtotalNorm) formulaMoi = `I${filaSubtotal}+I${filaSubtotalNorm}`;
         }
         if (cat !== CAT_NORMALIZACIONES && !esFijo && difParaMoi !== 0) {
             sheet.mergeCells(r, 1, r, 7);
@@ -1019,7 +1050,7 @@ async function exportarExcel() {
                 cell.fill = fillSolid(C.orangeL);
                 cell.font = { name: 'Arial', bold: true, size: 9, color: { argb: C.orange } };
                 cell.alignment = { horizontal: 'right', vertical: 'middle' };
-                if (col === 8) { cell.value = difParaMoi; cell.numFmt = MONEY; }
+                if (col === 8) { cell.value = { formula: formulaMoi, result: difParaMoi }; cell.numFmt = MONEY; }
             });
             r++;
         }
@@ -1031,6 +1062,7 @@ async function exportarExcel() {
     });
 
     const totalGeneralDif = totalGeneralContratista - totalGeneralRenova;
+    const filaTotalGeneral = r;
     sheet.mergeCells(r, 1, r, 4);
     const totLbl = sheet.getCell(r, 1);
     totLbl.value = 'TOTAL GENERAL';
@@ -1042,9 +1074,16 @@ async function exportarExcel() {
         cell.fill = fillSolid(C.blue);
         cell.font = { name: 'Arial', bold: true, size: 11, color: { argb: C.white } };
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
-        if (col === 6) { cell.value = totalGeneralRenova; cell.numFmt = MONEY; }
-        else if (col === 8) { cell.value = totalGeneralContratista; cell.numFmt = MONEY; }
-        else if (col === 9) { cell.value = totalGeneralDif; cell.numFmt = MONEY; }
+        if (col === 6) {
+            cell.value = subtotalRows.length ? { formula: subtotalRows.map(rr => `F${rr}`).join('+'), result: totalGeneralRenova } : totalGeneralRenova;
+            cell.numFmt = MONEY;
+        } else if (col === 8) {
+            cell.value = subtotalRows.length ? { formula: subtotalRows.map(rr => `H${rr}`).join('+'), result: totalGeneralContratista } : totalGeneralContratista;
+            cell.numFmt = MONEY;
+        } else if (col === 9) {
+            cell.value = { formula: `H${filaTotalGeneral}-F${filaTotalGeneral}`, result: totalGeneralDif };
+            cell.numFmt = MONEY;
+        }
     });
     sheet.getRow(r).height = 22;
 
