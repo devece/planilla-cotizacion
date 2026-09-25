@@ -50,8 +50,8 @@
     tr.row-impovar td { background: #FEF3C7; color: #78350F; font-size: 12px; }
     tr.row-impovar:hover td { background: #FDE68A; }
     .badge-impovar { font-size: 10px; background: #FDE68A; color: #92400E; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-left: 4px; }
-    tr.row-mas-usado td { background: #FCE4D6; }
-    tr.row-mas-usado:hover td { background: #FAD3BC; }
+    tr.row-mas-usado td { background: #FDF1EA; }
+    tr.row-mas-usado:hover td { background: #FBE3D3; }
     .input-text-libre { border: 1px solid var(--aba-border); border-radius: 6px; padding: 4px 6px; width: 100%; }
     .btn-quitar { color: #DC2626; background: none; border: none; cursor: pointer; font-size: 16px; line-height: 1; }
     .btn-quitar:hover { color: #991B1B; }
@@ -74,7 +74,14 @@
     </div>
 </div>
 
-<div class="sticky top-0 z-30 bg-white border-b shadow-sm" style="border-color: var(--aba-border);">
+<div class="sticky top-0 z-30 bg-white border-b shadow-sm" style="border-color: var(--aba-border); position: relative;">
+    <div class="dev-credit" style="position:absolute; top:8px; right:16px; display:flex; align-items:center; gap:8px;">
+        <div style="width:2px; align-self:stretch; background: var(--aba-orange);"></div>
+        <div style="line-height:1.15;">
+            <div style="font-size:13px; font-weight:700; color: var(--aba-orange);">Daniel Villalobos C.</div>
+            <div style="font-size:10px; font-weight:600; letter-spacing:.05em; color: var(--aba-gray);">DESARROLLADOR</div>
+        </div>
+    </div>
     <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
             <img src="assets/abastible-logo.png" alt="Abastible" style="height: 56px; width: auto;">
@@ -92,9 +99,6 @@
             <button onclick="exportarExcel()" class="btn-primary">📊 Exportar a Excel</button>
             <button onclick="window.print()" class="btn-secondary">🖨️ Imprimir</button>
         </div>
-    </div>
-    <div class="max-w-7xl mx-auto px-4 pb-2 text-right text-xs" style="color: var(--aba-gray);">
-        Daniel Villalobos — Desarrollador
     </div>
 </div>
 
