@@ -50,6 +50,8 @@
     tr.row-impovar td { background: #FEF3C7; color: #78350F; font-size: 12px; }
     tr.row-impovar:hover td { background: #FDE68A; }
     .badge-impovar { font-size: 10px; background: #FDE68A; color: #92400E; padding: 1px 6px; border-radius: 4px; font-weight: 600; margin-left: 4px; }
+    tr.row-mas-usado td { background: #FCE4D6; }
+    tr.row-mas-usado:hover td { background: #FAD3BC; }
     .input-text-libre { border: 1px solid var(--aba-border); border-radius: 6px; padding: 4px 6px; width: 100%; }
     .btn-quitar { color: #DC2626; background: none; border: none; cursor: pointer; font-size: 16px; line-height: 1; }
     .btn-quitar:hover { color: #991B1B; }
@@ -90,6 +92,9 @@
             <button onclick="exportarExcel()" class="btn-primary">📊 Exportar a Excel</button>
             <button onclick="window.print()" class="btn-secondary">🖨️ Imprimir</button>
         </div>
+    </div>
+    <div class="max-w-7xl mx-auto px-4 pb-2 text-right text-xs" style="color: var(--aba-gray);">
+        Daniel Villalobos — Desarrollador
     </div>
 </div>
 
@@ -226,6 +231,20 @@ const CAT_OBRAS_CIVILES = 'OBRAS CIVILES';
 // Ítems de base_datos.xlsx agrupados por centro (código, descripción, unidad, precio).
 // Se cargan de forma asíncrona al abrir la página — ver cargarBaseDatos() más abajo.
 let BASE_BY_CENTRO = {};
+
+// Códigos más usados por categoría (top 20% por frecuencia de aparición en Detalles
+// Comerciales reales, calculado por centro/proyecto). Se usa solo para destacar visualmente
+// esas filas con un fondo naranja sutil; no afecta precios ni cálculos.
+const ITEMS_MAS_USADOS = {
+    'CAÑERIAS AP': ['1002471'],
+    'CAÑERIAS MP': ['1002479', '1002483'],
+    'CAÑERIAS BP': ['1002479', '1002483'],
+    'SERVICIO CAÑERIAS': ['1000046', '1001226', '1001239'],
+    'CONEXIONES': ['1000005', '1000035', '1000036', '1000058', '1000067', '1000071', '1000208', '1000210', '1000211', '1000246', '1000247', '1000248', '1000256', '1000630', '1001215', '1001219', '1001374'],
+    'OBRAS CIVILES': ['1000006', '1000013', '1000033', '1000167', '1000171', '1000172', '1000181', '1000640', '1000642', '1000720', '1001202', '1001228', '1001431', '1001879'],
+    'NORMALIZACIONES': ['1000078', '1000212', '1000819', '1001253'],
+};
+function esMasUsado(cat, codigo) { return (ITEMS_MAS_USADOS[cat] || []).includes(codigo); }
 
 // Material de cañería Impovar (impovar.xlsx), agrupado por categoría: { 'CAÑERIAS AP': [{codigo,desc,diametro,precioML}], ... }
 // impovar.xlsx no trae columna centro, por lo que el material es el mismo para todos los centros.
@@ -411,7 +430,7 @@ function construirTablas() {
                     </tr></thead>
                     <tbody id="catTbody${catIdx}">`;
         items.forEach((it, itIdx) => {
-            html += `<tr class="row" data-cat="${catIdx}" data-it="${itIdx}" data-search="${escapeHtml((it.c + ' ' + it.d).toLowerCase())}">
+            html += `<tr class="row${esMasUsado(cat, it.c) ? ' row-mas-usado' : ''}" data-cat="${catIdx}" data-it="${itIdx}" data-search="${escapeHtml((it.c + ' ' + it.d).toLowerCase())}">
                 <td class="text-xs" style="color:var(--aba-gray);">${it.c.replace(/^0+/, '') || '-'}</td>
                 <td>${it.d}</td>
                 <td class="text-center">${it.u}</td>
